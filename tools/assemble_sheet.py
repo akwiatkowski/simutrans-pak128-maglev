@@ -183,20 +183,52 @@ def build_cell(path: pathlib.Path, spec, factor: int) -> np.ndarray:
 
 
 # --------------------------------------------------------------------------
-# Building sheets (stop, depot)
+# Building sheets (stop, depot, concourse)
 #
 # A building is not clipped to the tile: its roof legitimately rises above the
 # diamond and its eaves overhang the neighbours, which is how every pak128
 # building behaves. So the silhouette is a plain coverage test.
+#
+# The depot's door portal and the concourse's light cove render in the marker
+# colour and are stamped to the reserved light here, the same dance the track
+# and tube packers do. The concourse is packed RGBA — its canopy is glass and
+# needs real per-pixel alpha, like the tube sheets.
 # --------------------------------------------------------------------------
 
-def build_building_cell(path: pathlib.Path, factor: int) -> np.ndarray:
-    rgb, alpha = downsample(Image.open(path), factor)
+def build_building_cell(path: pathlib.Path, factor: int,
+                        rgba: bool = False) -> np.ndarray:
+    img = np.asarray(Image.open(path).convert("RGBA"))
+    r = img[..., 0].astype(np.int16)
+    g = img[..., 1].astype(np.int16)
+    b = img[..., 2].astype(np.int16)
+    flag = ((r - g) > 22) & ((b - g) > 22)
+    cleaned = img.copy()
+    cleaned[flag, 0:3] = np.array(LIGHT_BLUE, dtype=np.uint8)
+    n = layout.CELL
+    cover = flag.reshape(n, factor, n, factor).mean(axis=(1, 3))
+
+    rgb, alpha = downsample(Image.fromarray(cleaned, "RGBA"), factor)
+
+    if rgba:
+        keep = alpha > 0.02
+        out_rgb = np.zeros((layout.CELL, layout.CELL, 3), dtype=np.uint8)
+        out_a = np.zeros((layout.CELL, layout.CELL), dtype=np.uint8)
+        out_rgb[keep] = np.round(np.clip(rgb[keep], 0, 1) * 255.0).astype(np.uint8)
+        out_a[keep] = np.clip(np.round(alpha[keep] * 255.0),
+                              ALPHA_FLOOR, 255).astype(np.uint8)
+        lit = cover >= 0.35
+        out_rgb[lit] = LIGHT_BLUE
+        out_a[lit] = 255
+        out_rgb = avoid_special_colours(out_rgb, protect=lit)
+        return np.dstack([out_rgb, out_a])
+
     keep = alpha >= 0.5
     out = np.empty((layout.CELL, layout.CELL, 3), dtype=np.uint8)
     out[:, :] = layout.KEY
     out[keep] = np.round(rgb[keep] * 255.0).astype(np.uint8)
-    return avoid_special_colours(out)
+    lit = keep & (cover >= 0.35)
+    out[lit] = LIGHT_BLUE
+    return avoid_special_colours(out, protect=lit)
 
 
 def tile_cursor() -> np.ndarray:
@@ -212,7 +244,7 @@ def tile_cursor() -> np.ndarray:
 
 
 def building_icon(kind: str) -> np.ndarray:
-    """32x32 toolbar glyph: a platform pair, or a shed with its doorway."""
+    """32x32 toolbar glyph: platforms, a ribbed hall, or a glazed concourse."""
     img = np.full((layout.CELL, layout.CELL, 3), layout.KEY, dtype=np.uint8)
     img[2:30, 2:30] = (206, 210, 214)
     if kind == "station":
@@ -220,10 +252,26 @@ def building_icon(kind: str) -> np.ndarray:
         img[15:18, 4:28] = (120, 126, 134)      # guideway between them
         img[18:21, 4:28] = (176, 180, 184)      # near platform
         img[20:21, 4:28] = (163, 133, 43)       # safety strip
+    elif kind == "concourse":
+        yy, xx = np.mgrid[0:layout.CELL, 0:layout.CELL].astype(float)
+        # Same superellipse family as the canopy geometry.
+        inside = (np.abs((xx - 15.5) / 13.0) ** 2.6
+                  + np.abs((yy - 26.0) / 20.0) ** 2.6) <= 1.0
+        inside &= yy <= 26
+        img[inside] = (172, 208, 216)                    # teal glazing
+        img[inside & (np.abs(xx - 15.5) <= 0.8)] = (120, 128, 140)   # spine
+        img[(yy >= 21) & (yy <= 24) & (np.abs(xx - 15.5) <= 11)] = (176, 180, 184)
+        img[(yy >= 24) & (yy <= 27) & (np.abs(xx - 15.5) <= 11)] = (120, 126, 134)
+        # Cove glow at the springing points, one step off the reserved light.
+        img[(yy >= 19) & (yy <= 21) & ((np.abs(xx - 3.5) <= 1) | (np.abs(xx - 27.5) <= 1))] = (130, 158, 240)
     else:
         img[16:27, 6:26] = (150, 155, 162)      # hall walls
-        img[8:17, 6:26] = (96, 102, 112)        # roof
+        img[8:17, 6:26] = (96, 102, 112)        # ribbed vault
+        for rib in (8, 13, 18, 23):
+            img[8:17, rib:rib + 1] = (70, 76, 86)
         img[19:27, 12:20] = (28, 30, 34)        # doorway
+        img[19:27, 11:12] = (127, 156, 240)     # lit portal jambs, one step
+        img[19:27, 20:21] = (127, 156, 240)     # off the reserved light
     return img
 
 
@@ -302,6 +350,13 @@ def tube_icon() -> np.ndarray:
     return img
 
 
+def opaque(rgb_tile: np.ndarray) -> Image.Image:
+    """RGB cell with the key colour turned into real transparency."""
+    alpha = np.where(np.all(rgb_tile == np.array(layout.KEY), axis=-1), 0, 255)
+    return Image.fromarray(
+        np.dstack([rgb_tile, alpha.astype(np.uint8)]), "RGBA")
+
+
 def assemble_tube(args) -> None:
     from PIL import ImageDraw
 
@@ -322,12 +377,6 @@ def assemble_tube(args) -> None:
                 sheet.paste(Image.fromarray(tile, "RGBA"),
                             (col * layout.CELL, out_row * layout.CELL))
                 done += 1
-
-    def opaque(rgb_tile):
-        """RGB cell with the key colour turned into real transparency."""
-        alpha = np.where(np.all(rgb_tile == np.array(layout.KEY), axis=-1), 0, 255)
-        return Image.fromarray(
-            np.dstack([rgb_tile, alpha.astype(np.uint8)]), "RGBA")
 
     sheet.paste(opaque(tube_icon()), (6 * layout.CELL, 0))
     sheet.paste(opaque(tile_cursor()), (7 * layout.CELL, 0))
@@ -357,7 +406,8 @@ def main() -> None:
     parser.add_argument("--base", help="sheet to take any missing cells from")
     parser.add_argument("--supersample", type=int, default=4)
     parser.add_argument("--sheet", default="track",
-                        choices=["track", "tube", "station", "depot", "vehicle"],
+                        choices=["track", "tube", "station", "depot",
+                                 "concourse", "vehicle"],
                         help="which sheet layout to pack")
     args = parser.parse_args()
 
@@ -405,9 +455,13 @@ def main() -> None:
 def assemble_building(args) -> None:
     from PIL import ImageDraw
 
+    # The concourse canopy is glazing and needs real per-pixel alpha, so its
+    # sheet is RGBA like the tubes'; the opaque buildings keep the RGB key.
+    rgba = args.sheet == "concourse"
     cells_dir = pathlib.Path(args.cells)
-    sheet = Image.new("RGB", (layout.STATION_COLS * layout.CELL,
-                              layout.STATION_ROWS * layout.CELL), layout.KEY)
+    size = (layout.STATION_COLS * layout.CELL, layout.STATION_ROWS * layout.CELL)
+    sheet = Image.new("RGBA", size, (0, 0, 0, 0)) if rgba \
+        else Image.new("RGB", size, layout.KEY)
 
     done, missing = 0, []
     for (row, col) in sorted(layout.STATION_PLAN):
@@ -415,28 +469,38 @@ def assemble_building(args) -> None:
         if not path.exists():
             missing.append(f"{row}.{col}")
             continue
-        sheet.paste(Image.fromarray(build_building_cell(path, args.supersample)),
+        tile = build_building_cell(path, args.supersample, rgba=rgba)
+        sheet.paste(Image.fromarray(tile, "RGBA" if rgba else "RGB"),
                     (col * layout.CELL, row * layout.CELL))
         done += 1
 
     irow, icol = layout.STATION_ICON_CELL
-    sheet.paste(Image.fromarray(building_icon(args.sheet)),
-                (icol * layout.CELL, irow * layout.CELL))
+    icon = building_icon(args.sheet)
     crow, ccol = layout.STATION_CURSOR_CELL
-    sheet.paste(Image.fromarray(tile_cursor()), (ccol * layout.CELL, crow * layout.CELL))
+    cursor = tile_cursor()
+    if rgba:
+        sheet.paste(opaque(icon), (icol * layout.CELL, irow * layout.CELL))
+        sheet.paste(opaque(cursor), (ccol * layout.CELL, crow * layout.CELL))
+    else:
+        sheet.paste(Image.fromarray(icon), (icol * layout.CELL, irow * layout.CELL))
+        sheet.paste(Image.fromarray(cursor), (ccol * layout.CELL, crow * layout.CELL))
 
     draw = ImageDraw.Draw(sheet)
     draw.rectangle([0, 0, layout.STATION_COLS * layout.CELL - 1, layout.CELL - 1],
-                   fill=(255, 255, 255))
+                   fill=(255, 255, 255, 255) if rgba else (255, 255, 255))
     for i, line in enumerate([
             f"name: MAGLEV_{args.sheet.upper()}",
             "copyright: Aleksander Kwiatkowski - Artistic License 2.0",
             "",
             "generated by tools/blender/build_maglev_buildings.py",
             "row 1: back L0, back L1, front L0, front L1, icon, cursor"]):
-        draw.text((10, 12 + i * 14), line, fill=(0, 0, 0))
+        draw.text((10, 12 + i * 14), line,
+                  fill=(0, 0, 0, 255) if rgba else (0, 0, 0))
 
-    scrub_sheet(sheet).save(args.out)
+    # The depot and concourse legitimately carry the reserved light (portal
+    # outline, cove); protecting it keeps the scrub from nudging it dark.
+    protect = args.sheet in ("depot", "concourse")
+    scrub_sheet(sheet, protect_light=protect).save(args.out)
     print(f"wrote {args.out}: {done} rendered cells"
           + (f", missing {', '.join(missing)}" if missing else ""))
 

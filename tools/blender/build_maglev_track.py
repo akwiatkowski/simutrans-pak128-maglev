@@ -231,12 +231,7 @@ SPINE_DEPTH = 0.13
 
 def arch(half_width, height, segments=TUBE_SEGMENTS):
     """Half a superellipse arch, crown first, as (perp, height) in metres."""
-    points = []
-    for i in range(segments + 1):
-        angle = (math.pi / 2) * i / segments
-        points.append((half_width * math.sin(angle) ** (2.0 / TUBE_EXPONENT),
-                       height * math.cos(angle) ** (2.0 / TUBE_EXPONENT)))
-    return points
+    return iso.arch(half_width, height, segments, TUBE_EXPONENT)
 
 
 def tube_profile(swell=0.0, scale=1.0):

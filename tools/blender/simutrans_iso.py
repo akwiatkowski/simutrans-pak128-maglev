@@ -208,6 +208,23 @@ def render_to(path: str) -> None:
 # Mesh helpers
 # --------------------------------------------------------------------------
 
+def arch(half_width: float, height: float, segments: int,
+         exponent: float = 2.6):
+    """Half a superellipse arch, crown first, as (perp, height) pairs.
+
+    Exponent 2 is a plain semi-ellipse; higher flattens the crown and draws in
+    the shoulders, which reads as an engineered fairing rather than a
+    polytunnel. Shared by the tube, the depot vault and the concourse canopy,
+    so every curved shell in the set belongs to the same family.
+    """
+    points = []
+    for i in range(segments + 1):
+        angle = (math.pi / 2) * i / segments
+        points.append((half_width * math.sin(angle) ** (2.0 / exponent),
+                       height * math.cos(angle) ** (2.0 / exponent)))
+    return points
+
+
 def new_mesh(name: str, verts, faces, materials=None, bevel: float = 0.0):
     """Build an object from raw geometry, with normals made consistent.
 

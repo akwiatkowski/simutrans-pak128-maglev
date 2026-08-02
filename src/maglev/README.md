@@ -78,22 +78,47 @@ The tube keeps the same central beam as every other tier, which is what makes
 all rolling stock compatible with all guideways: every pod wraps the same beam,
 so it cannot look wrong on any tier.
 
-## Stop, depot and vehicle
+## Stop, depot, concourse and vehicle
 
-All three are original artwork now, rendered from the same Blender rig:
+All are original artwork, rendered from the same Blender rig:
 
 ```sh
 make station     # two platforms flanking the guideway
-make depot       # barrel-vault maintenance hangar
+make depot       # ribbed superellipse maintenance hall
+make concourse   # fusion-era glazed stop (RGBA sheet)
 make fleet       # every trainset in the roster, eight travel directions each
 make art         # all of the above plus the track
 ```
 
-Stop and depot are Simutrans *buildings*: two orientations (layout 0 for a N/S
-way, layout 1 for E/W), each split into a back image drawn before vehicles and
-a front image drawn after. That split is what puts the near platform in front
-of a stopped train, and the shed in front of a stabled one. The way keeps
-drawing the guideway underneath, so neither sheet paves the ground.
+Stop, depot and concourse are Simutrans *buildings*: two orientations (layout
+0 for a N/S way, layout 1 for E/W), each split into a back image drawn before
+vehicles and a front image drawn after. That split is what puts the near
+platform in front of a stopped train, and the shed in front of a stabled one.
+The way keeps drawing the guideway underneath, so none of the sheets pave the
+ground.
+
+The **depot** is a superellipse vault — the tube's own engineered-fairing
+family, not a barrel — in pale 700-tier composite, its character told the way
+every tier tells its own: one bold rhythm (proud steel rib hoops continued
+down the walls as pilasters) plus working detail sized for 128px. The crown
+spine carries the overhead crane rail out over the doorway, skylight strips
+run between the ribs, the flank glazing is segmented bay by bay, extraction
+pods and a comms mast sit on the far slope, and the 500 guideway's
+safety-orange conduit arrives home along the plinth. The door portal and the
+interior service-pit bars render in the magenta marker and are stamped to the
+reserved `#7F9BF1` at pack time — after dark the doorway stays outlined and
+the hall glows faintly through the open door.
+
+The **concourse** (`maglev_concourse.dat`, intro 2064, the year Aetheris
+appeared) is the fusion-era roofed stop: the tube in bloom. A wide
+superellipse glass vault spans both platforms on the tube's 8m hoop grid, so
+hoops land on tile joints and chain down a long platform. It is split down
+the crown exactly like the tube — far half in the back image, near half in
+the front image — so a waiting train is seen *through* the canopy. A light
+cove runs along both springing lines on a low concrete base beam, swapped to
+the reserved light at pack time: a night concourse glows like the tubes it
+feeds. Its sheet is RGBA, like the tubes', because glazing needs real
+per-pixel alpha.
 
 Vehicle sizing follows pak128's convention rather than real metres — measured
 against its own Shinkansen, a pak128 car is about two thirds of its real height

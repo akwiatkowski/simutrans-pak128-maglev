@@ -1,13 +1,13 @@
-"""Build and render the maglev stop and depot in Blender.
+"""Build and render the maglev stop, depot and concourse in Blender.
 
     blender --background --python tools/blender/build_maglev_buildings.py -- \
         --object station --out build/station
 
-Both objects share Simutrans' building layout: two orientations (layout 0 for a
+All objects share Simutrans' building layout: two orientations (layout 0 for a
 N/S way, layout 1 for E/W) and, per orientation, a back image drawn before
 vehicles and a front image drawn after. That split is what lets a train stand
-between a station's two platforms, or sit inside a depot with the shed in
-front of it.
+between a station's two platforms, sit inside a depot with the shed in front
+of it, or show through the near half of a glazed canopy.
 
 Everything is modelled in track-local coordinates — `u` along the way, `v`
 across it, `w` up — and then mapped onto world axes per layout, so each object
@@ -47,7 +47,6 @@ EDGE_STRIP = 0.55        # tactile safety strip along the platform edge
 PARAPET_THICK = 0.18
 PARAPET_TOP = 0.55       # above the platform deck; kept low so a
                          # stopped train is not walled in
-
 # Profile of one platform, as (distance from centreline, height). Swept along
 # the way exactly like the guideway's cross-section.
 PLATFORM_PROFILE = [
@@ -68,39 +67,86 @@ PLATFORM_LENGTH = 8.05           # half length; a touch over half a tile so
 # the camera. pak128's own depot puts the doorway on a near-facing side so the
 # interior is visible; this does the same.
 #
-# Deliberately *not* a pitched-roof shed with eaves — that silhouette reads as
-# a barn, which is wrong for a maglev. A barrel vault over flush panel walls,
-# with a glazed arch above the door, is the shape modern rail and aircraft
-# maintenance halls actually use, and it is legible at 128px.
+# The shell is a *superellipse* vault, not a half-ellipse: a flattened crown
+# with drawn-in shoulders is the same engineered-fairing family as the vacuum
+# tube, so the depot reads as maglev infrastructure rather than a barn or a
+# polytunnel. Its character follows the set's law — escalation is density of
+# engineering — through details sized to survive 128px: proud steel rib hoops
+# on a strict rhythm, a crown spine carrying the overhead crane rail out over
+# the doorway, skylight strips, segmented flank glazing between pilasters,
+# roof vents, a comms mast, the 500's safety-orange conduit arriving home
+# along the plinth, and a door portal outlined in the marker colour that the
+# packer swaps for the reserved never-dim light.
 # --------------------------------------------------------------------------
 
 HALL_HALF_LEN = 7.0      # along the way
 HALL_HALF_WID = 6.6      # across it
-WALL_TOP = 5.0           # top of the vertical cladding
-RIDGE_TOP = 9.2          # crown of the vault
-VAULT_SEGMENTS = 14
+WALL_TOP = 4.6           # top of the vertical cladding
+RIDGE_TOP = 9.0          # crown of the vault
+VAULT_EXP = 2.6          # same superellipse exponent as the tube
+VAULT_SEGMENTS = 16
 DOOR_HALF = 3.0
-DOOR_TOP = 4.3
-WALL_THICK = 0.35
+DOOR_TOP = 4.2
+
+RIB_US = (-5.6, -2.8, 0.0, 2.8, 5.6)   # hoop centrelines along the hall
+RIB_WIDTH = 0.45         # along the way; ~2px, a clear band not a wire
+RIB_PROUD = 0.32         # how far a hoop stands off the shell
+PILASTER_PROUD = 0.18    # the hoop's continuation down the wall
+
+SPINE_HALF = 0.55        # crane-rail housing along the crown
+SPINE_DEPTH = 0.50
+SPINE_NOSE = 0.9         # housing overhangs the door, so the crane can pick
+                         # up a bogie from the apron — the working detail
+                         # that says "maintenance", not "warehouse"
+
+SKYLIGHT_BANDS = ((0.53, 0.61), (0.39, 0.47))   # vault params, near and far
+WINDOW_LO, WINDOW_HI = 2.4, 3.9                 # flank glazing band heights
+
+VENT_US = (1.4, 3.4, 5.4)    # extraction pods, rear half of the far slope
+VENT_V = -2.3
+VENT_HALF = 0.75
+VENT_TOP = 0.62
+
+MAST_U, MAST_V = 6.3, -5.6   # comms mast on the rear far shoulder
+MAST_TOP = 11.0
+MAST_HALF = 0.11
+
+CONDUIT_LO, CONDUIT_HI = 0.55, 0.95   # orange service tray on the plinth,
+CONDUIT_PROUD = 0.16                  # the 500 guideway's tray arriving home
+
+PORTAL_PROUD = 0.25      # door frame standing off the front face
+PORTAL_THICK = 0.55
+LIT_STRIP = 0.30         # marker-lit door outline; ~1px of light after
+                         # packing, swapped for the reserved #7F9BF1
 
 PALETTE = {
     "summer": {
         "platform": (0.560, 0.560, 0.555),
         "strip": (0.640, 0.520, 0.170),      # amber tactile strip
         "wall": (0.615, 0.625, 0.640),
-        "shell": (0.545, 0.565, 0.595),
+        "shell": (0.655, 0.695, 0.735),      # pale engineered composite (700)
+        "frame": (0.420, 0.450, 0.500),      # structural steel
         "glazing": (0.120, 0.155, 0.190),
         "interior": (0.070, 0.075, 0.085),
+        "canopy_tint": (0.50, 0.70, 0.76),   # fusion-era teal glass
+        "canopy_frame": (0.400, 0.430, 0.480),
     },
     "winter": {
         "platform": (0.790, 0.800, 0.805),
         "strip": (0.620, 0.510, 0.180),
         "wall": (0.720, 0.730, 0.740),
         "shell": (0.760, 0.775, 0.790),       # snow on the vault
+        "frame": (0.550, 0.580, 0.630),
         "glazing": (0.130, 0.170, 0.210),
         "interior": (0.070, 0.075, 0.085),
+        "canopy_tint": (0.60, 0.80, 0.86),
+        "canopy_frame": (0.490, 0.520, 0.570),
     },
 }
+
+# Safety-orange, same paint as the 500's cable tray; carries a whisper of
+# self-emission so the shaded flank cannot turn the paint to mud.
+DUCT_ORANGE = (0.760, 0.235, 0.045)
 
 
 def frame(layout_index: int):
@@ -130,12 +176,19 @@ def box(name, u_axis, v_axis, u0, u1, v0, v1, w0, w1, material, bevel=0.0):
     return iso.new_mesh(name, verts, faces, material, bevel)
 
 
+def make_duct_material():
+    duct = iso.make_material("duct", DUCT_ORANGE, roughness=0.55)
+    bsdf = duct.node_tree.nodes["Principled BSDF"]
+    bsdf.inputs["Emission Color"].default_value = (*DUCT_ORANGE, 1.0)
+    bsdf.inputs["Emission Strength"].default_value = 0.28
+    return duct
+
+
 # --------------------------------------------------------------------------
 # Station
 # --------------------------------------------------------------------------
 
-def build_station(layout_index: int, part: str, pal) -> None:
-    u_axis, v_axis = frame(layout_index)
+def build_platforms(u_axis, v_axis, part: str, pal) -> None:
     concrete = iso.make_material("platform", pal["platform"], roughness=0.94,
                                  noise=0.28, seams=0.07, seam_period_m=4.0)
     strip = iso.make_material("strip", pal["strip"], roughness=0.85, noise=0.20)
@@ -154,23 +207,78 @@ def build_station(layout_index: int, part: str, pal) -> None:
                             {PLATFORM_STRIP_EDGE: 1}, bevel=iso.m(0.05))
 
 
+def build_station(layout_index: int, part: str, pal) -> None:
+    u_axis, v_axis = frame(layout_index)
+    build_platforms(u_axis, v_axis, part, pal)
+
+
 # --------------------------------------------------------------------------
 # Depot
 # --------------------------------------------------------------------------
 
-def vault_profile():
-    """Cross-section of the hangar: flush walls closed by a half-ellipse vault.
+def vault_point(t: float):
+    """Point on the vault at parameter t: 0 = left springing, 1 = right.
 
-    Returned as (across, height) in metres, left to right. The first and last
-    edges are the vertical walls; everything between is the vault.
+    (v, w) in metres. The arc is a superellipse sitting on the wall top.
     """
+    ang = math.pi * (t - 0.5)
+    s = math.sin(ang)
+    v = HALL_HALF_WID * math.copysign(abs(s) ** (2.0 / VAULT_EXP), s)
+    w = WALL_TOP + (RIDGE_TOP - WALL_TOP) * math.cos(ang) ** (2.0 / VAULT_EXP)
+    return v, w
+
+
+def vault_normal(t: float):
+    """Outward unit normal of the vault at parameter t, via the tangent."""
+    d = 1e-3
+    (v0, w0) = vault_point(max(0.0, t - d))
+    (v1, w1) = vault_point(min(1.0, t + d))
+    length = math.hypot(v1 - v0, w1 - w0)
+    return -(w1 - w0) / length, (v1 - v0) / length
+
+
+def vault_ribbon(t0: float, t1: float, lift_inner: float, lift_outer: float,
+                 steps: int = 12):
+    """Closed crescent hugging the vault between params t0..t1, in metres.
+
+    Details that follow the shell — rib hoops, skylight strips — are offset
+    along the true surface normal; offsetting along w alone would leave them
+    flush at the shoulders where the surface turns vertical.
+    """
+    ts = [t0 + (t1 - t0) * i / steps for i in range(steps + 1)]
+    outer, inner = [], []
+    for t in ts:
+        v, w = vault_point(t)
+        nv, nw = vault_normal(t)
+        outer.append((v + nv * lift_outer, w + nw * lift_outer))
+        inner.append((v + nv * lift_inner, w + nw * lift_inner))
+    return outer + list(reversed(inner))
+
+
+def vault_profile():
+    """Cross-section of the hall: flush walls closed by the superellipse."""
     points = [(-HALL_HALF_WID, 0.0)]
-    rise = RIDGE_TOP - WALL_TOP
-    for i in range(VAULT_SEGMENTS + 1):
-        t = math.pi * i / VAULT_SEGMENTS
-        points.append((-HALL_HALF_WID * math.cos(t), WALL_TOP + rise * math.sin(t)))
+    points += [vault_point(i / VAULT_SEGMENTS) for i in range(VAULT_SEGMENTS + 1)]
     points.append((HALL_HALF_WID, 0.0))
     return points
+
+
+def vault_w(v: float) -> float:
+    """Shell height above a given offset from the centreline."""
+    rise = RIDGE_TOP - WALL_TOP
+    return WALL_TOP + rise * (1.0 - (abs(v) / HALL_HALF_WID) ** VAULT_EXP) \
+        ** (1.0 / VAULT_EXP)
+
+
+def sweep(name, profile_m, u_axis, v_axis, u0, u1, material,
+          edge_materials=None, bevel=0.0, caps=True):
+    """Extrude a (v, w) metre profile along the hall axis from u0 to u1."""
+    profile = [(iso.m(v), iso.m(w)) for v, w in profile_m]
+    return iso.extrude_profile(name, profile,
+                               local(u_axis, v_axis, u0, 0.0),
+                               local(u_axis, v_axis, u1, 0.0),
+                               v_axis, Vector((0, 0, 1)), material,
+                               edge_materials, bevel=bevel, caps=caps)
 
 
 def build_depot(layout_index: int, part: str, pal) -> None:
@@ -180,38 +288,98 @@ def build_depot(layout_index: int, part: str, pal) -> None:
     shell = iso.make_material("shell", pal["shell"], roughness=0.42,
                               metallic=0.25, noise=0.05,
                               seams=0.06, seam_period_m=1.6, seam_width_m=0.05)
+    steel = iso.make_material("steel", pal["frame"], roughness=0.38,
+                              metallic=0.55, noise=0.05)
     glazing = iso.make_material("glazing", pal["glazing"], roughness=0.12,
                                 metallic=0.45)
     interior = iso.make_material("interior", pal["interior"], roughness=1.0)
+    lit = iso.make_flag_emission("lit")
 
     profile_m = vault_profile()
-    profile = [(iso.m(v), iso.m(w)) for v, w in profile_m]
-    nose = local(u_axis, v_axis, -HALL_HALF_LEN, 0.0)
-    tail = local(u_axis, v_axis, HALL_HALF_LEN, 0.0)
-    up = Vector((0, 0, 1))
 
     if part == "back":
         # Only what shows through the doorway. Shrinking the same profile gives
-        # a dark inner skin that follows the vault, so the opening reads as
-        # depth rather than as a flat black panel.
-        inner = [(iso.m(v * 0.93), iso.m(w * 0.93)) for v, w in profile_m]
-        iso.extrude_profile("interior_skin", inner, nose, tail, v_axis, up,
-                            interior, caps=True)
+        # a dark inner skin that follows the vault. Open at the door end —
+        # a capped end puts a flat dark panel right at the door plane, which
+        # both kills the depth and hides the pit lights behind it.
+        inner = [(v * 0.93, w * 0.93) for v, w in profile_m]
+        sweep("interior_skin", inner, u_axis, v_axis,
+              -HALL_HALF_LEN, HALL_HALF_LEN, interior, caps=False)
+        iso.new_mesh("interior_rear",
+                     [local(u_axis, v_axis, HALL_HALF_LEN, v, w)
+                      for v, w in inner],
+                     [list(range(len(inner)))], interior)
+        # Service-pit edge lights either side of the beam: two raised bars in
+        # the marker colour, so the hall glows faintly through the open door
+        # after dark — a depot that is never quite asleep.
+        for side in (-1.0, 1.0):
+            bar = box(f"pit{side:+.0f}", u_axis, v_axis,
+                      -HALL_HALF_LEN + 0.2, HALL_HALF_LEN - 1.0,
+                      side * 0.85, side * 1.15, 0.0, 0.30, lit)
+            iso.no_shadow(bar)
         return
 
     # Shell: walls plus vault as one open-ended skin, so the ends can carry
     # their own geometry.
-    edge_materials = {i: 1 for i in range(1, len(profile) - 2)}
-    iso.extrude_profile("shell", profile, nose, tail, v_axis, up,
-                        [wall, shell], edge_materials, bevel=iso.m(0.05),
-                        caps=False)
+    edge_materials = {i: 1 for i in range(1, len(profile_m) - 2)}
+    sweep("shell", profile_m, u_axis, v_axis, -HALL_HALF_LEN, HALL_HALF_LEN,
+          [wall, shell], edge_materials, bevel=iso.m(0.05), caps=False)
 
-    # Ribbon glazing along both flanks, flush with the cladding.
+    # Skylight strips flanking the crown spine, running the length of the
+    # hall. The rib hoops cross proud over them, chopping the glass into a
+    # bar rhythm — the roof detail that reads at 128px.
+    for i, (t0, t1) in enumerate(SKYLIGHT_BANDS):
+        sweep(f"skylight{i}", vault_ribbon(t0, t1, -0.06, 0.05, steps=6),
+              u_axis, v_axis, -HALL_HALF_LEN + 0.6, HALL_HALF_LEN - 0.6,
+              glazing, caps=False)
+
+    # Structural rib hoops over the vault, continued down the walls as
+    # pilasters: one bold rhythm, the way each guideway tier carries one.
+    hoop = vault_ribbon(0.0, 1.0, 0.02, RIB_PROUD, steps=24)
+    for u in RIB_US:
+        sweep(f"rib{u:+.1f}", hoop, u_axis, v_axis,
+              u - RIB_WIDTH / 2, u + RIB_WIDTH / 2, steel, caps=False)
+        for side in (-1.0, 1.0):
+            box(f"pilaster{u:+.1f}{side:+.0f}", u_axis, v_axis,
+                u - RIB_WIDTH / 2, u + RIB_WIDTH / 2,
+                side * HALL_HALF_WID, side * (HALL_HALF_WID + PILASTER_PROUD),
+                0.0, WALL_TOP + 0.05, steel)
+
+    # Crown spine housing the overhead crane rail, run out over the doorway so
+    # the crane can pick straight off the apron.
+    box("spine", u_axis, v_axis,
+        -HALL_HALF_LEN - SPINE_NOSE, HALL_HALF_LEN,
+        -SPINE_HALF, SPINE_HALF,
+        RIDGE_TOP - SPINE_DEPTH + 0.30, RIDGE_TOP + 0.30, steel,
+        bevel=iso.m(0.05))
+
+    # Extraction pods on the far slope, and a comms mast on the rear shoulder:
+    # the roof furniture a working hall actually grows.
+    for u in VENT_US:
+        base = vault_w(VENT_V) - 0.15
+        box(f"vent{u:+.1f}", u_axis, v_axis, u - VENT_HALF, u + VENT_HALF,
+            VENT_V - 0.6, VENT_V + 0.6, base, base + VENT_TOP, steel,
+            bevel=iso.m(0.04))
+    mast_base = vault_w(MAST_V) - 0.2
+    box("mast", u_axis, v_axis, MAST_U - MAST_HALF, MAST_U + MAST_HALF,
+        MAST_V - MAST_HALF, MAST_V + MAST_HALF, mast_base, MAST_TOP, steel)
+    box("mast_arm", u_axis, v_axis, MAST_U - 0.06, MAST_U + 0.06,
+        MAST_V - 0.5, MAST_V + 0.5, MAST_TOP - 0.5, MAST_TOP - 0.38, steel)
+
+    # Segmented flank glazing between the pilasters — a lit workshop band
+    # rather than one anonymous ribbon.
+    duct = make_duct_material()
     for side in (-1.0, 1.0):
-        box(f"ribbon{side:+.0f}", u_axis, v_axis,
-            -HALL_HALF_LEN + 1.4, HALL_HALF_LEN - 1.4,
-            side * HALL_HALF_WID, side * (HALL_HALF_WID + 0.05),
-            WALL_TOP - 2.1, WALL_TOP - 0.7, glazing)
+        for u0, u1 in zip(RIB_US, RIB_US[1:]):
+            box(f"window{u0:+.1f}{side:+.0f}", u_axis, v_axis,
+                u0 + RIB_WIDTH / 2 + 0.35, u1 - RIB_WIDTH / 2 - 0.35,
+                side * HALL_HALF_WID, side * (HALL_HALF_WID + 0.05),
+                WINDOW_LO, WINDOW_HI, glazing)
+        # The 500's safety-orange service tray, arrived home along the plinth.
+        box(f"conduit{side:+.0f}", u_axis, v_axis,
+            -HALL_HALF_LEN + 0.1, HALL_HALF_LEN - 0.1,
+            side * (HALL_HALF_WID + 0.02), side * (HALL_HALF_WID + CONDUIT_PROUD),
+            CONDUIT_LO, CONDUIT_HI, duct)
 
     # Rear end: closed by the full profile.
     iso.new_mesh("rear", [local(u_axis, v_axis, HALL_HALF_LEN, v, w)
@@ -232,13 +400,134 @@ def build_depot(layout_index: int, part: str, pal) -> None:
                  [local(u_axis, v_axis, -HALL_HALF_LEN, v, w) for v, w in lintel],
                  [[0, 1, 2, 3]], wall)
 
-    arch = profile_m[1:-1]          # the vault span, wall top to wall top
+    arch_pts = [vault_point(i / VAULT_SEGMENTS) for i in range(VAULT_SEGMENTS + 1)]
     iso.new_mesh("arch_glazing",
-                 [local(u_axis, v_axis, -HALL_HALF_LEN + 0.05, v, w) for v, w in arch],
-                 [list(range(len(arch)))], glazing)
+                 [local(u_axis, v_axis, -HALL_HALF_LEN + 0.05, v, w)
+                  for v, w in arch_pts],
+                 [list(range(len(arch_pts)))], glazing)
+
+    # Door portal: a proud steel frame, its inner edge traced in the marker
+    # colour — packed into the reserved light, the doorway stays outlined
+    # after the map dims. The depot's own thread that never goes out.
+    front = -HALL_HALF_LEN
+    for side in (-1.0, 1.0):
+        box(f"portal{side:+.0f}", u_axis, v_axis,
+            front - PORTAL_PROUD, front + 0.2,
+            side * DOOR_HALF, side * (DOOR_HALF + PORTAL_THICK),
+            0.0, DOOR_TOP + PORTAL_THICK, steel, bevel=iso.m(0.04))
+    box("portal_head", u_axis, v_axis, front - PORTAL_PROUD, front + 0.2,
+        -DOOR_HALF - PORTAL_THICK, DOOR_HALF + PORTAL_THICK,
+        DOOR_TOP, DOOR_TOP + PORTAL_THICK, steel, bevel=iso.m(0.04))
+    for side in (-1.0, 1.0):
+        strip = box(f"portal_lit{side:+.0f}", u_axis, v_axis,
+                    front - PORTAL_PROUD - 0.03, front - PORTAL_PROUD + 0.10,
+                    side * (DOOR_HALF + 0.02), side * (DOOR_HALF + 0.02 + LIT_STRIP),
+                    0.25, DOOR_TOP + 0.02, lit)
+        iso.no_shadow(strip)
+    head = box("portal_lit_head", u_axis, v_axis,
+               front - PORTAL_PROUD - 0.03, front - PORTAL_PROUD + 0.10,
+               -DOOR_HALF - 0.02 - LIT_STRIP, DOOR_HALF + 0.02 + LIT_STRIP,
+               DOOR_TOP + 0.02, DOOR_TOP + 0.02 + LIT_STRIP, lit)
+    iso.no_shadow(head)
 
 
-BUILDERS = {"station": build_station, "depot": build_depot}
+# --------------------------------------------------------------------------
+# Concourse: the fusion-era roofed stop — the tube in bloom.
+#
+# A wide superellipse glass vault spans both platforms, the same fairing
+# family and the same 8m structural grid as the vacuum tube, so a tube line
+# arriving at a concourse reads as one system opening out. Split down the
+# crown exactly like the tube: the far half ships in the back image, the near
+# half in the front image, which Simutrans draws after vehicles — a train is
+# seen *through* the canopy. A light cove runs along both springing lines in
+# the marker colour, swapped at pack time for the reserved #7F9BF1, so a
+# night concourse glows like the tubes it feeds.
+# --------------------------------------------------------------------------
+
+CANOPY_HALF = 7.35       # springing, metres from the centreline
+CANOPY_RISE = 6.7        # crown height; airy over a 4m train
+CANOPY_THICK = 0.16      # glazing plus frame; two edges in silhouette
+CANOPY_SEGMENTS = 12
+CANOPY_RIB_US = (-8.0, 0.0, 8.0)   # the tube's 8m hoop grid, so hoops land on
+                                   # tile joints and chain across a platform
+CANOPY_RIB_WIDTH = 0.28
+CANOPY_RIB_PROUD = 0.10
+CANOPY_SPINE_HALF = 0.40
+CANOPY_SPINE_DEPTH = 0.14
+COVE_LO, COVE_HI = 0.60, 1.00      # light cove along the springing
+COVE_PROUD = 0.08
+FOOT_IN, FOOT_OUT = 0.45, 0.30     # base beam the glass lands on
+FOOT_TOP = 0.50
+
+
+def canopy_profile(swell: float = 0.0):
+    """Closed crescent for one half of the canopy, crown to springing."""
+    outer = iso.arch(CANOPY_HALF + swell, CANOPY_RISE + swell, CANOPY_SEGMENTS)
+    inner = iso.arch(CANOPY_HALF + swell - CANOPY_THICK,
+                     CANOPY_RISE + swell - CANOPY_THICK, CANOPY_SEGMENTS)
+    return outer + list(reversed(inner))
+
+
+def build_concourse(layout_index: int, part: str, pal) -> None:
+    u_axis, v_axis = frame(layout_index)
+    up = Vector((0, 0, 1))
+    build_platforms(u_axis, v_axis, part, pal)
+
+    glass = iso.make_glass("canopy", pal["canopy_tint"],
+                           face_alpha=0.12, edge_alpha=0.65)
+    steel = iso.make_material("canopy_frame", pal["canopy_frame"],
+                              roughness=0.38, metallic=0.55, noise=0.05)
+    concrete = iso.make_material("foot", pal["platform"], roughness=0.94,
+                                 noise=0.28)
+    cove_mat = iso.make_flag_emission("cove")
+
+    # Near half rides in the front image, far half in the back image; the
+    # profile is one-sided, so the side is just the sweep perpendicular.
+    side = 1.0 if part == "front" else -1.0
+    start = local(u_axis, v_axis, -PLATFORM_LENGTH, 0.0)
+    end = local(u_axis, v_axis, PLATFORM_LENGTH, 0.0)
+
+    def half_sweep(name, profile_m, material, u0=-PLATFORM_LENGTH,
+                   u1=PLATFORM_LENGTH, caps=False):
+        profile = [(iso.m(v), iso.m(w)) for v, w in profile_m]
+        return iso.extrude_profile(name, profile,
+                                   local(u_axis, v_axis, u0, 0.0),
+                                   local(u_axis, v_axis, u1, 0.0),
+                                   v_axis * side, up, material, caps=caps)
+
+    shell = half_sweep("canopy", canopy_profile(), glass)
+    iso.no_shadow(shell)
+
+    # Structural hoops on the tube's world grid, and the crown spine on the
+    # near half only — one unbroken line down the run.
+    hoop = canopy_profile(swell=CANOPY_RIB_PROUD)
+    for u in CANOPY_RIB_US:
+        half_sweep(f"hoop{u:+.0f}", hoop, steel,
+                   u - CANOPY_RIB_WIDTH / 2, u + CANOPY_RIB_WIDTH / 2)
+    if part == "front":
+        spine = [(-CANOPY_SPINE_HALF, CANOPY_RISE - 0.02),
+                 (CANOPY_SPINE_HALF, CANOPY_RISE - 0.02),
+                 (CANOPY_SPINE_HALF, CANOPY_RISE + CANOPY_SPINE_DEPTH),
+                 (-CANOPY_SPINE_HALF, CANOPY_RISE + CANOPY_SPINE_DEPTH)]
+        iso.extrude_profile("spine", [(iso.m(v), iso.m(w)) for v, w in spine],
+                            start, end, v_axis, up, steel, caps=False)
+
+    # The glass lands on a low concrete base beam outside each platform, with
+    # the light cove along its top edge — the never-dim thread at eye height.
+    half_sweep("foot", [(CANOPY_HALF - FOOT_IN, 0.0),
+                        (CANOPY_HALF - FOOT_IN, FOOT_TOP),
+                        (CANOPY_HALF + FOOT_OUT, FOOT_TOP),
+                        (CANOPY_HALF + FOOT_OUT, 0.0)], concrete, caps=True)
+    cove = half_sweep("cove", [(CANOPY_HALF - COVE_PROUD, COVE_LO),
+                               (CANOPY_HALF + COVE_PROUD, COVE_LO),
+                               (CANOPY_HALF + COVE_PROUD, COVE_HI),
+                               (CANOPY_HALF - COVE_PROUD, COVE_HI)], cove_mat,
+                      caps=True)
+    iso.no_shadow(cove)
+
+
+BUILDERS = {"station": build_station, "depot": build_depot,
+            "concourse": build_concourse}
 
 
 def parse_args():

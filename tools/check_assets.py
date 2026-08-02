@@ -53,7 +53,11 @@ def parse_ref(value):
     return None
 
 # Sheets that legitimately carry per-pixel alpha (glazing).
-RGBA_EXPECTED = re.compile(r"maglev_tube")
+RGBA_EXPECTED = re.compile(r"maglev_(tube|concourse)")
+
+# Sheets that legitimately carry the reserved #7F9BF1 light: the tubes' cove,
+# the concourse's cove, and the depot's lit door portal and pit strips.
+LIGHT_EXPECTED = re.compile(r"maglev_(tube|concourse|depot)")
 
 
 class Report:
@@ -165,7 +169,7 @@ def check_reserved_colours(sheets, report):
         a = np.array(img.convert("RGB")).astype(np.uint32)
         packed = (a[..., 0] << 16) | (a[..., 1] << 8) | a[..., 2]
         hits = np.isin(packed, reserved)
-        if RGBA_EXPECTED.search(name):
+        if LIGHT_EXPECTED.search(name):
             hits &= packed != light
         n = int(hits.sum())
         if n:
