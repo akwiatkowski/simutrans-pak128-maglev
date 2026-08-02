@@ -59,23 +59,57 @@ REF_MAIL = 50
 REF_CAR_WEIGHT = 52.0
 REF_HEAD_WEIGHT = 68.0
 REF_POWER = 10_000          # kW, head only
-REF_CAR_COST = 52_000_000
-REF_HEAD_COST = 78_000_000
-REF_CAR_RUN = 410
-REF_HEAD_RUN = 690
+
+# Cost & running-cost references are calibrated against pak128's own fastest
+# rail stock (read straight out of vehicles.rail-engines / rail-psg+mail
+# .pak): RVg Tigress 400km/h — engine run 494, wagon run 44, engine price
+# 98.9M; RVg Thunder 2 370km/h — engine 304, wagon 55; ACE3/E320 320km/h —
+# powered cars 207-512, trailers 130-330. pak128 passengers pay value=14 per
+# unit-tile /3000 in cents, so a ~550-seat 400km/h set earns ~26 cr/tile at
+# neutral speed bonus against ~13 cr/tile running cost — revenue ≈ 2x cost.
+# The maglev ladder keeps a modest premium over the equivalent rail class;
+# earlier constants (410/690 per car/head) were set by eye, priced every set
+# 10-20x above rail and made every route run at a guaranteed loss.
+REF_CAR_COST = 13_000_000
+REF_HEAD_COST = 24_000_000
+REF_CAR_RUN = 30
+REF_HEAD_RUN = 240
 REF_CAR_FIXED = 1_400
 REF_HEAD_FIXED = 2_600
 
 # Power rises as v^2, which keeps the *distance* needed to reach top speed
 # proportional to speed. Holding acceleration itself constant would need v^3 —
-# a 2360x jump from 300 to 4000 — which is absurd. Even so, expect the fastest
-# sets to need 50-100 tiles to wind up.
+# a 2360x jump from 300 to 4000 — which is absurd. Measured with the ported
+# engine physics (tools/render_readme_trains.py) the ladder winds up in 6-15
+# tiles — Transrapid-like, and quick enough that stop spacing is set by the
+# dwell and fare bonus, not by acceleration.
 POWER_EXP = 2.0
-COST_EXP = 1.8
-RUN_EXP = 1.5
+
+# Cost and running-cost scaling are dictated by how Simutrans standard prices
+# transport: fares do NOT rise with era — passengers pay value=14 per
+# unit-tile forever, adjusted only by the speed bonus *relative to the fleet
+# average*, and this roster IS the maglev fleet average (pak128's
+# speedbonus.tab has no maglev line, so the game averages our own heads).
+# Since revenue per tile is roughly flat across generations, speed can only
+# pay through throughput: more tiles per year, not more credits per tile.
+#
+# RUN_EXP = 0 therefore: engineering progress exactly cancels the speed tax,
+# which is what pak128's own stock does (its 400 km/h wagons run *cheaper*
+# per seat-tile than its 320 km/h ones: Tigress 44/62 seats vs ACE3 ~200-500
+# per powered car). Anything above ~0.3 makes every post-2100 set run at a
+# guaranteed loss at full load — verified by sweeping the whole roster
+# against the ported revenue model in tools/render_readme_trains.py.
+#
+# COST_EXP = 0.95 keeps purchase-price paybacks in the 5-15 game-year band
+# across the ladder; at the old 1.8 the vacuum-era flagship needed >100
+# years to repay itself against fares that never grew.
+COST_EXP = 0.95
+RUN_EXP = 0.0
 # Capacity falls as speed rises: faster stock is more structure and more
-# premium per seat. This is what stops later generations being strictly better.
-PAX_EXP = -0.22
+# premium per seat. This is what stops later generations being strictly
+# better. Gentler than the original -0.22: with flat fares the seat count is
+# the only revenue lever left, and -0.22 starved the late roster into losses.
+PAX_EXP = -0.10
 
 # Per-variant character. `power` and `weight` together set acceleration:
 # a standard ends up with ~1.6x the flagship's power-to-weight.
@@ -84,8 +118,11 @@ VARIANTS = {
                      run=0.62, fixed=0.62, load=1100, life=90),
     "standard": dict(pax=1.15, power=1.45, weight=0.92, cost=1.00,
                      run=1.35, fixed=1.35, load=700, life=45),
-    "value":    dict(pax=1.05, power=0.85, weight=1.00, cost=0.55,
-                     run=2.10, fixed=1.35, load=1000, life=40),
+    # Value stock crams high-density seating (pax 1.20) into a cheap shell:
+    # it runs a class behind the fleet average, so it always sells discounted
+    # speed-bonus fares — the extra seats are what keep it above water.
+    "value":    dict(pax=1.20, power=0.85, weight=1.00, cost=0.55,
+                     run=1.55, fixed=1.35, load=1000, life=40),
 }
 
 COMPANY_LIVERY = {"Meridian": "meridian", "Kestrel": "kestrel",
