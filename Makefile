@@ -43,8 +43,12 @@ build: makeobj
 	cd "$(SOURCE_DIR)" && "$(abspath $(MAKEOBJ))" PAK128 "$(abspath $(OUTPUT))" *.dat vehicles/
 
 install: build
-	mkdir -p "$(EVALUATION_USER_DIR)/addons/pak128"
+	mkdir -p "$(EVALUATION_USER_DIR)/addons/pak128/text"
 	cp "$(OUTPUT)" "$(EVALUATION_USER_DIR)/addons/pak128/"
+	# Simutrans loads addon display names from addons/<pak>/text/*.tab
+	# (dataobj/translator.cc). Without these the depot list shows raw
+	# object ids like Maglev_Meridian500_Head.
+	cp "$(SOURCE_DIR)"/text/*.tab "$(EVALUATION_USER_DIR)/addons/pak128/text/"
 
 run: install
 	@test -x "$(GAME_BINARY)" || { echo "Missing game binary: $(GAME_BINARY)"; exit 1; }

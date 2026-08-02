@@ -111,6 +111,55 @@ as a speckle along every run. `assemble_sheet.py` therefore takes the ground
 silhouette from the projection maths instead, and only uses a coverage test for
 the parts standing above ground.
 
+## The visual language
+
+Nothing here is decoration: every visual difference encodes something a player
+can act on, so shape and colour double as the datasheet.
+
+**Guideway tiers — enclosure grows, the beam never changes.** All tiers keep the
+same central T-beam, which is what makes every vehicle compatible with every
+way: a pod wraps the same beam everywhere, so it cannot look wrong on any tier.
+Tiers differ by what is built *around* it — bare beam, side walls, fairings,
+then a glazed tube. The enclosed tiers escalate by *density of engineering*
+(rib pitch, tint, framing), not by new shapes.
+
+Two things learned tuning the tube, both counter-intuitive:
+
+- **Every hoop draws twice** — you see the far one through the glass as well as
+  the near one — so on-screen rib rhythm is double the modelled pitch. 4m read
+  as a polytunnel; 8m reads as infrastructure.
+- **A continuous spine along the crown** did more for the high-tech read than
+  any amount of rib tuning. And for the *endgame* tier the framing gets
+  sparser, not denser: greebles read as industrial, and a smoother tube reads
+  as the more advanced one.
+
+**Vehicles — three independent axes.**
+
+| Axis | Carries | How |
+|---|---|---|
+| Manufacturer | who operates it | colour band along the **roof** |
+| Grade | flagship / standard / value | proportions and door count |
+| Era | how advanced | continuous streamlining by speed |
+| Cargo | passengers or mail | windows, or none |
+
+Grade is the important one, because the silhouette states the stats:
+
+| | Nose | Roof | Window band | Doors |
+|---|---|---|---|---|
+| Flagship | long | low | narrow | **1** |
+| Standard | short | tall | deep | **3** |
+| Value | short | medium | medium | **2** |
+
+A standard *looks* boxier and really does seat ~1.6x a flagship. **Door count is
+the readable form of dwell time** — three doors and a 700ms stop against one
+door and 1100ms. Era is a continuous function of the set's own speed rather
+than a set of buckets, so all sixteen trainsets differ; the arc runs *train ->
+capsule*, and at the fast end a head car is almost entirely nose.
+
+Colour goes on the **roof**, never the flank — see the isometric note below.
+A mail van is identified by having no windows and one wide loading door, which
+reads at 50x25px where a change of hue does not.
+
 ## Adding a new asset
 
 The rig is done; a new object is mostly measurement plus geometry. The order
@@ -164,6 +213,21 @@ below is what actually worked, and skipping step 1 is what costs time.
   through route a couple of centimetres; it is a tenth of a pixel on screen.
 - **A reversed vehicle needs no new artwork.** Point its `.dat` at the same
   sheet with every direction swapped for its opposite.
+- **Identity marks belong on top surfaces.** A 30-degree camera shows far more
+  roof than flank; a side stripe is effectively invisible at 128px. Four
+  liveries were indistinguishable until the colour moved to the roof.
+- **Two coordinate conventions coexist here** and they are transposed: Blender
+  works in world `(x=E, y=N)`, the sheet layout in tile `(a=N, b=E)`. Hand-placed
+  preview sprites hide the confusion; `preview_layout.place_consist` derives the
+  cell from the way and raises on a mismatch instead.
+- **Reserved colours are a trap.** Simutrans keeps 31 exact colours that mean
+  player colour or "do not darken at night", and several of the greys sit in the
+  concrete range. `assemble_sheet.scrub_sheet` nudges accidental matches; apply
+  it to the *whole sheet*, since icons and captions are pasted after the cells.
+- **Flag-colour substitution needs a loose test.** An accent rendered in a
+  marker colour and swapped for a real Simutrans light shifts a long way from
+  the marker once it is seen through glass. An exact match let pink streaks
+  through on every junction tile.
 
 ## Scripts
 

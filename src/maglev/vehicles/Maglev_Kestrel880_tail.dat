@@ -1,6 +1,6 @@
 obj=vehicle
 name=Maglev_Kestrel880_Tail
-copyright=Olek
+copyright=Aleksander Kwiatkowski
 waytype=maglev_track
 engine_type=electric
 speed=880

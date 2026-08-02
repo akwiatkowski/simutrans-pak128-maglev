@@ -1,18 +1,18 @@
 #TRACK
 obj=way
-name=Prototype_Maglev_Track_160
-copyright=Olek
+name=Prototype_Maglev_Track_700
+copyright=Aleksander Kwiatkowski
 waytype=maglev_track
 draw_as_ding=1
-cost=60000
-maintenance=1000
-topspeed=160
+cost=240000
+maintenance=3100
+topspeed=700
 max_weight=80
-intro_year=2000
+intro_year=2032
 intro_month=1
 retire_year=2999
 retire_month=1
-icon=> maglev_track.0.4
+icon=> maglev_track.0.6
 cursor=maglev_track.0.7,0,-16
 #SUMMER
 Image[-][0]=maglev_track.1.0

@@ -144,6 +144,19 @@ TUBE_SEGMENTS = 11
 # Two hoops per tile. Every hoop shows twice — you see the far one through the
 # glass — so the on-screen rhythm is double the pitch. At 4m it read as a
 # polytunnel; 8m leaves the glass room to be glass.
+# Tier character. Escalation is *density of engineering*, not new shapes —
+# same reason the guideway ladder works. The 4000 tier deliberately gets the
+# sparsest framing: greebles read as industrial, and at the endgame a smoother,
+# more seamless tube reads as the more advanced one.
+TUBE_TIERS = {
+    1000: dict(rib_pitch=8.0, tint=(0.62, 0.78, 0.82), face=0.10, edge=0.60,
+               frame=(0.470, 0.495, 0.535)),
+    2000: dict(rib_pitch=6.0, tint=(0.52, 0.70, 0.76), face=0.13, edge=0.66,
+               frame=(0.400, 0.430, 0.480)),
+    4000: dict(rib_pitch=11.0, tint=(0.44, 0.60, 0.70), face=0.16, edge=0.72,
+               frame=(0.330, 0.360, 0.420)),
+}
+
 RIB_PITCH = 8.0          # metres between structural hoops
 RIB_WIDTH = 0.26
 RIB_PROUD = 0.09         # how far a rib stands off the glazing
@@ -173,27 +186,26 @@ def arch(half_width, height, segments=TUBE_SEGMENTS):
     return points
 
 
-def tube_profile(swell=0.0):
+def tube_profile(swell=0.0, scale=1.0):
     """Closed crescent for one half of the tube wall, in world units.
 
     Outer arc from crown to springing, across the thickness, inner arc back.
     `swell` fattens it into a rib.
     """
-    outer = arch(TUBE_HALF_WIDTH + swell, TUBE_HEIGHT + swell)
-    inner = arch(TUBE_HALF_WIDTH + swell - TUBE_THICKNESS,
-                 TUBE_HEIGHT + swell - TUBE_THICKNESS)
+    half, high = TUBE_HALF_WIDTH * scale, TUBE_HEIGHT * scale
+    outer = arch(half + swell, high + swell)
+    inner = arch(half + swell - TUBE_THICKNESS, high + swell - TUBE_THICKNESS)
     loop = outer + list(reversed(inner))
     return [(iso.m(p), iso.m(h)) for p, h in loop]
 
 
-def rib_positions(start, axis, length):
+def rib_positions(start, axis, length, pitch=RIB_PITCH):
     """World positions of the hoops along a run.
 
     Measured from the world origin rather than from the run, so hoops line up
     across tile boundaries the same way the apron's panel joints do.
     """
     origin_offset = start.dot(axis) / iso.m(1.0)      # in metres
-    pitch = RIB_PITCH
     first = math.ceil(origin_offset / pitch) * pitch
     out, here = [], first
     while here < origin_offset + length / iso.m(1.0):
@@ -277,7 +289,7 @@ def runs_for(spec):
 # Cell construction
 # --------------------------------------------------------------------------
 
-def build_cell(spec, season, enclosure="none", part="back"):
+def build_cell(spec, season, enclosure="none", part="back", tier=1000):
     """Populate the scene with one tile's geometry.
 
     With `enclosure="tube"` the cell is split: the back part carries the apron,
@@ -288,7 +300,7 @@ def build_cell(spec, season, enclosure="none", part="back"):
     shape = layout.tile_shape(spec)
 
     if enclosure == "tube" and part == "front":
-        build_tube(spec, season, near=True)
+        build_tube(spec, season, near=True, tier=tier)
         return
 
     # The apron is panelled concrete like every other pak128 way; the girder
@@ -351,7 +363,7 @@ def build_cell(spec, season, enclosure="none", part="back"):
                                  girder_mat)
 
     if enclosure == "tube":
-        build_tube(spec, season, near=False)
+        build_tube(spec, season, near=False, tier=tier)
 
 
 def build_plinth(spec, shape, up, material) -> None:
@@ -374,27 +386,42 @@ def build_plinth(spec, shape, up, material) -> None:
                             side, up, material, bevel=iso.m(0.05))
 
 
-def build_tube(spec, season, near: bool) -> None:
+def build_tube(spec, season, near: bool, tier: int = 1000) -> None:
     """Sweep one half of the glass tube, with its structural hoops."""
     pal = PALETTE[season]
+    cfg = TUBE_TIERS[tier]
     shape = layout.tile_shape(spec)
     up = iso.ground_normal(shape)
 
+    winter = season == "winter"
     cove_mat = iso.make_flag_emission("cove")
-    glass = iso.make_glass("glazing", pal["glass_tint"],
-                           face_alpha=pal["glass_face"],
-                           edge_alpha=pal["glass_edge"])
-    frame = iso.make_material("frame", pal["frame"], roughness=0.38,
-                              metallic=0.55, noise=0.05)
+    glass = iso.make_glass("glazing",
+                           tuple(min(1.0, c + (0.10 if winter else 0.0))
+                                 for c in cfg["tint"]),
+                           face_alpha=cfg["face"], edge_alpha=cfg["edge"])
+    frame = iso.make_material("frame",
+                              tuple(min(1.0, c + (0.09 if winter else 0.0))
+                                    for c in cfg["frame"]),
+                              roughness=0.38, metallic=0.55, noise=0.05)
 
-    wall = tube_profile()
-    hoop = tube_profile(swell=RIB_PROUD)
     spine = [(iso.m(-SPINE_HALF), iso.m(TUBE_HEIGHT - 0.02)),
              (iso.m(SPINE_HALF), iso.m(TUBE_HEIGHT - 0.02)),
              (iso.m(SPINE_HALF), iso.m(TUBE_HEIGHT + SPINE_DEPTH)),
              (iso.m(-SPINE_HALF), iso.m(TUBE_HEIGHT + SPINE_DEPTH))]
 
-    for i, spec_run in enumerate(runs_for(spec)):
+    # At a junction two tubes would otherwise clip edge to edge, which reads as
+    # a modelling error rather than a junction. Shrinking the branch bore lets
+    # it nest inside the through bore the way a real branch tunnel meets a main
+    # one. The through route is the one the switch variant already raised.
+    runs = runs_for(spec)
+    through = max(runs, key=lambda r: r.get("lift", 0.0)) if len(runs) > 1 else None
+
+    for i, spec_run in enumerate(runs):
+        branch = through is not None and spec_run is not through
+        bore = 0.90 if branch else 1.0
+        wall = tube_profile(scale=bore)
+        hoop = tube_profile(swell=RIB_PROUD, scale=bore)
+
         start = iso.ground_point(shape, *spec_run["start"])
         end = iso.ground_point(shape, *spec_run["end"])
         axis = end - start
@@ -430,12 +457,13 @@ def build_tube(spec, season, near: bool) -> None:
 
         # Only the near pass carries the spine; drawing it in both would
         # double a line that sits exactly on the crown.
-        if near:
+        if near and not branch:
             iso.extrude_profile(f"spine{i}", spine,
                                 start - axis * over, end + axis * over,
                                 side, up, frame, bevel=0.0, caps=False)
 
-        for k, along in enumerate(rib_positions(start, axis, run_length)):
+        for k, along in enumerate(rib_positions(start, axis, run_length,
+                                                 cfg["rib_pitch"])):
             base = start + axis * along
             iso.extrude_profile(f"hoop{i}_{k}", hoop,
                                 base - axis * iso.m(RIB_WIDTH / 2),
@@ -475,6 +503,7 @@ def parse_args():
     p.add_argument("--samples", type=int, default=96)
     p.add_argument("--supersample", type=int, default=4)
     p.add_argument("--enclosure", default="none", choices=["none", "tube"])
+    p.add_argument("--tier", type=int, default=1000, choices=sorted(TUBE_TIERS))
     return p.parse_args(argv)
 
 
@@ -497,7 +526,7 @@ def main() -> None:
             for part in parts:
                 iso.setup(supersample=args.supersample, samples=args.samples,
                           shape=layout.tile_shape(spec))
-                build_cell(spec, season, args.enclosure, part)
+                build_cell(spec, season, args.enclosure, part, args.tier)
                 if args.enclosure == "tube":
                     out_row = layout.tube_row(row, part, season)
                 else:

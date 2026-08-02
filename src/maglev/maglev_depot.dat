@@ -1,6 +1,6 @@
 obj=building
 name=Prototype_Maglev_Depot
-copyright=Olek
+copyright=Aleksander Kwiatkowski
 type=depot
 waytype=maglev_track
 Dims=1,1,2

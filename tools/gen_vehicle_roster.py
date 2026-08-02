@@ -85,7 +85,7 @@ VARIANTS = {
     "standard": dict(pax=1.15, power=1.45, weight=0.92, cost=1.00,
                      run=1.35, fixed=1.35, load=700, life=45),
     "value":    dict(pax=1.05, power=0.85, weight=1.00, cost=0.55,
-                     run=1.50, fixed=1.10, load=1000, life=40),
+                     run=2.10, fixed=1.35, load=1000, life=40),
 }
 
 COMPANY_LIVERY = {"Meridian": "meridian", "Kestrel": "kestrel",
@@ -173,7 +173,7 @@ def write_set(out_dir, company, speed, variant, intro):
     files = {}
 
     files[f"{stem}_head.dat"] = (
-        f"obj=vehicle\nname={stem}_Head\ncopyright=Olek\n{common}"
+        f"obj=vehicle\nname={stem}_Head\ncopyright=Aleksander Kwiatkowski\n{common}"
         f"sound=train-horn-electric-0.wav\n"
         f"freight=Passagiere\npayload={s['head_pax']}\n"
         f"power={s['power']}\ngear=260\nweight={s['head_weight']}\n"
@@ -186,7 +186,7 @@ def write_set(out_dir, company, speed, variant, intro):
         + images(head_sheet))
 
     files[f"{stem}_car.dat"] = (
-        f"obj=vehicle\nname={stem}_Car\ncopyright=Olek\n{common}sound=-1\n"
+        f"obj=vehicle\nname={stem}_Car\ncopyright=Aleksander Kwiatkowski\n{common}sound=-1\n"
         f"freight=Passagiere\npayload={s['car_pax']}\n"
         f"power=0\nweight={s['car_weight']}\n"
         f"cost={s['car_cost']:.0f}\nrunningcost={s['car_run']}\n"
@@ -200,7 +200,7 @@ def write_set(out_dir, company, speed, variant, intro):
         + images(car_sheet))
 
     files[f"{stem}_mail.dat"] = (
-        f"obj=vehicle\nname={stem}_Mail\ncopyright=Olek\n{common}sound=-1\n"
+        f"obj=vehicle\nname={stem}_Mail\ncopyright=Aleksander Kwiatkowski\n{common}sound=-1\n"
         f"freight=Post\npayload={s['mail']}\n"
         f"power=0\nweight={round(s['car_weight'] * 0.95, 1)}\n"
         f"cost={s['car_cost'] * 0.88:.0f}\nrunningcost={round(s['car_run'] * 0.9)}\n"
@@ -216,7 +216,7 @@ def write_set(out_dir, company, speed, variant, intro):
     # The tail is the head's artwork with every direction swapped for its
     # opposite, so the nose points back down the train. No second render.
     files[f"{stem}_tail.dat"] = (
-        f"obj=vehicle\nname={stem}_Tail\ncopyright=Olek\n{common}sound=-1\n"
+        f"obj=vehicle\nname={stem}_Tail\ncopyright=Aleksander Kwiatkowski\n{common}sound=-1\n"
         f"freight=Passagiere\npayload={s['head_pax']}\n"
         f"power=0\nweight={round(s['head_weight'] * 0.82, 1)}\n"
         f"cost={s['head_cost'] * 0.55:.0f}\nrunningcost={round(s['head_run'] * 0.6)}\n"

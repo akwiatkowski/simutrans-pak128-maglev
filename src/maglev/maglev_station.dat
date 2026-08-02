@@ -1,6 +1,6 @@
 obj=building
 name=Prototype_Maglev_Stop
-copyright=Olek
+copyright=Aleksander Kwiatkowski
 type=stop
 waytype=maglev_track
 enables_pax=1

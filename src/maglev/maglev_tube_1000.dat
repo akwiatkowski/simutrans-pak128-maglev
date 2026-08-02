@@ -1,7 +1,7 @@
 #TUBE
 obj=way
 name=Prototype_Maglev_Tube_1000
-copyright=Olek
+copyright=Aleksander Kwiatkowski
 waytype=maglev_track
 draw_as_ding=1
 # Enclosed glazed guideway. The back images carry the apron, the beam and

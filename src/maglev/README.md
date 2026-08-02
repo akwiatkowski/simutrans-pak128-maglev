@@ -27,11 +27,37 @@ by `topspeed`, cost and maintenance in their `.dat` files. Each has its own
 toolbar icon in row 0 so they can be told apart when building. The sheet
 carries winter tiles as well as summer ones.
 
-## Enclosed guideway (tier 4, 1000 km/h)
+## Speed ladder
 
-`maglev_tube.png` is the glazed tube: `make tube`. It is the first of the
-enclosed tiers, and the only sheet in the set written as **RGBA** — glass needs
-real per-pixel alpha, which the `#E7FFFF` key cannot express.
+Way tiers and vehicle speeds are deliberately **staggered** — line speed is
+`min(vehicle, way)`, so if they matched there would be no decision to make.
+
+| Tier | Speed | From | Sheet |
+|---|---|---|---|
+| open | 300 | 2000 | `maglev_track.png` |
+| open | 500 | 2014 | `maglev_track.png` |
+| open | 700 | 2032 | `maglev_track.png` |
+| tube | 1000 | 2080 | `maglev_tube.png` |
+| tube | 2000 | 2100 | `maglev_tube2000.png` |
+| tube | 4000 | 2165 | `maglev_tube4000.png` |
+
+The three open tiers share one sheet and differ only by `topspeed`, cost and
+intro year, each with its own toolbar icon. See the plan for why the ladder is
+staggered against the vehicle roster.
+
+## Enclosed guideway (tiers 4-6)
+
+The glazed tubes are the only sheets written as **RGBA** — glass needs real
+per-pixel alpha, which the `#E7FFFF` key cannot express. `make tube` renders
+the 1000; the 2000 and 4000 use the same geometry with denser or sparser
+framing and a deeper tint (`TUBE_TIERS` in the builder).
+
+At a junction the branch bore is rendered at 90% scale so it nests inside the
+through bore, rather than two equal tubes clipping edge to edge.
+
+A light cove runs along the springing, rendered in a marker colour and swapped
+during packing for `#7F9BF1` — a reserved Simutrans light that does not darken
+at night, so a tube line stays lit when the map dims.
 
 It carries **two full ribi sets** in four 5-row blocks (back summer, front
 summer, back winter, front winter). The back images hold the apron, the beam
@@ -90,6 +116,13 @@ measured about the floor line, with only a slight draw-in of the upper body.
 
 Propulsion on a real maglev is in the guideway, not the vehicle, but Simutrans
 needs a vehicle to carry the power rating, so the head does.
+
+## Display names
+
+`text/en.tab` carries the display names; `make install` copies it to
+`addons/pak128/text/`, which is where Simutrans looks for addon translations
+(`dataobj/translator.cc`). Without it the depot list shows raw object ids.
+Regenerate it alongside the roster.
 
 ## Known gaps
 

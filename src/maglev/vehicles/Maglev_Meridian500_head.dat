@@ -1,6 +1,6 @@
 obj=vehicle
 name=Maglev_Meridian500_Head
-copyright=Olek
+copyright=Aleksander Kwiatkowski
 waytype=maglev_track
 engine_type=electric
 speed=500
