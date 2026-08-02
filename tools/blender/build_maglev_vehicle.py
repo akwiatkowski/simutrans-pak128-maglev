@@ -17,6 +17,17 @@ guideway drawn underneath disappears under the vehicle exactly where it should.
 The section is symmetric with chamfered ends, because the prototype has one
 vehicle type that couples to itself. See `NOSE_START` for why the ends are not
 domed. A streamlined nose wants a second, head-only vehicle type.
+
+Roles
+-----
+All four vehicle roles share one body loft; what tells them apart is the roof,
+because from the 30-degree camera the roof is most of what a player sees:
+
+* ``car``  — glazed skylight panes set into the accent crown band
+* ``mail`` — sealed crown with transverse roof hatches, no windows anywhere
+* ``head`` — streamlined nose plus a dorsal power blister on the flat roof
+* ``tail`` — the head's geometry with the windscreen blanked to body colour,
+  so a train visibly has a lit front and a blind back
 """
 
 from __future__ import annotations
@@ -91,6 +102,48 @@ DOOR_WIDTH = 0.95
 DOOR_LO, DOOR_HI = 0.34, 2.05
 DOOR_PROUD = 0.03
 MAIL_DOOR_WIDTH = 2.40                  # one wide loading door, no windows
+
+# --------------------------------------------------------------------------
+# Per-role roof and flank treatments.
+#
+# Every role shares the loft; the roof is what tells them apart, because the
+# 30-degree camera shows far more roof than flank. Passenger cars carry glass
+# up there, mail carries machinery, the head carries its power blister.
+# --------------------------------------------------------------------------
+
+# Recessed door grooves and a segmented window band. Set False to revert to
+# proud door panels on a continuous band (the pre-2026-08 flank look).
+SCULPTED_FLANKS = True
+
+# Passenger skylight: glazed panes replacing stretches of the accent crown
+# band, so the company colour frames the glass instead of vanishing under it.
+SKYLIGHT_SPAN = 0.62         # fraction of the body length under glass
+SKYLIGHT_PANES = 3
+SKYLIGHT_GAP = 0.28          # accent-coloured mullion between panes, metres
+
+# Mail roof: transverse hatch fairings. Grey machinery on a sealed white
+# crown is what separates mail from passenger when both share one loft.
+HATCH_POSITIONS = (-2.8, 0.0, 2.8)
+HATCH_LEN = 0.85             # along the body
+HATCH_HALF = 0.55            # across; inside the roof band
+HATCH_RISE = 0.12            # proud of the crown
+HATCH_SINK = 0.08            # buried below it, so edges never float
+
+# Head dorsal blister: a power fairing on whatever flat roof the nose leaves.
+# Fast sets grow their nose until no flat roof remains, so the blister
+# disappears on its own — a vacuum capsule stays sealed and smooth.
+BLISTER_HALF = 0.62          # widest half width, inside the roof band
+BLISTER_RISE = 0.26          # above the crown at its highest
+BLISTER_SINK = 0.10          # buried into the roof
+BLISTER_MAX_LEN = 3.4
+BLISTER_MIN_LEN = 1.2        # less flat roof than this: no blister at all
+
+# Flank sculpting (all behind SCULPTED_FLANKS).
+GROOVE_DEPTH = 0.05          # door pocket recess into the body side
+GROOVE_MARGIN = 0.10         # pocket wider than its door, each side
+WINDOW_PANE = 1.35           # window segment length between mullions
+WINDOW_PANE_GAP = 0.30       # body-coloured mullion between segments
+STATION_STEP = 0.35          # interior loft density so treatments land crisp
 
 
 def era(speed: float) -> float:
@@ -229,19 +282,106 @@ def nose(u: float, nose_len: float = None) -> tuple[float, float]:
     return width, height
 
 
-def stations(variant: str, nose_len: float = None):
+def stations(role: str, nose_len: float = None):
     """Positions along the body where a cross-section is placed."""
     length = nose_len or NOSE_LEN
     out = {-HALF_LEN, 0.0, HALF_LEN}
     for i in range(9):                              # dense through the tapers
         out.add(-HALF_LEN + (HALF_LEN - NOSE_START) * i / 8)
-    if variant == "head":
+    if role in ("head", "tail"):
         for i in range(15):                         # denser still up the nose
             out.add(HALF_LEN - length + length * i / 14)
     else:
         for i in range(9):
             out.add(HALF_LEN - (HALF_LEN - NOSE_START) * i / 8)
+    # Uniform interior rings: skylight panes, window mullions and door grooves
+    # are painted per face, so the loft needs faces there to paint.
+    steps = int(2 * NOSE_START / STATION_STEP)
+    for i in range(steps + 1):
+        out.add(-NOSE_START + i * STATION_STEP)
     return sorted(round(u, 4) for u in out)
+
+
+def door_spots(count: int, mail: bool):
+    """Door centre positions along the body, shared by doors and grooves."""
+    if mail or count == 1:
+        return [0.0]
+    span = BODY_LENGTH * 0.30
+    if count == 2:
+        return [-span * 0.7, span * 0.7]
+    return [-span, 0.0, span]
+
+
+def skylight_pane(u: float) -> bool:
+    """Is this position under one of the passenger skylight panes?"""
+    span = BODY_LENGTH * SKYLIGHT_SPAN
+    pane = (span - (SKYLIGHT_PANES - 1) * SKYLIGHT_GAP) / SKYLIGHT_PANES
+    x = u + span / 2
+    return 0.0 <= x <= span and x % (pane + SKYLIGHT_GAP) <= pane
+
+
+def window_gap(u: float) -> bool:
+    """Is this position on a mullion between window segments?"""
+    return (u + HALF_LEN) % (WINDOW_PANE + WINDOW_PANE_GAP) > WINDOW_PANE
+
+
+def in_groove(u: float, grooves) -> bool:
+    return any(lo + 0.01 < u < hi - 0.01 for lo, hi in grooves)
+
+
+_BOX_FACES = [[0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4],
+              [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]]
+
+
+def _box(name, forward, across, up, u_lo, u_hi, v_half, z_lo, z_hi, material):
+    """An axis-aligned box in body coordinates, sunk wherever z_lo says."""
+    corners = [(u_lo, -v_half), (u_hi, -v_half), (u_hi, v_half), (u_lo, v_half)]
+    verts = []
+    for z in (z_lo, z_hi):
+        for du, dv in corners:
+            verts.append(forward * iso.m(du) + across * iso.m(dv)
+                         + up * iso.m(z))
+    iso.new_mesh(name, verts, _BOX_FACES, material)
+
+
+def build_hatches(forward, across, up, prop, material):
+    """Transverse roof hatches: the mail van's identity from above."""
+    for k, u0 in enumerate(HATCH_POSITIONS):
+        _box(f"hatch_{k}", forward, across, up,
+             u0 - HATCH_LEN / 2, u0 + HATCH_LEN / 2, HATCH_HALF,
+             prop["roof"] - HATCH_SINK, prop["roof"] + HATCH_RISE, material)
+
+
+def build_blister(forward, across, up, prop, material):
+    """Dorsal power fairing on the head's remaining flat roof.
+
+    Spans from just behind the nose taper back towards the coupling chamfer.
+    The nose grows with speed, so late flagships have no flat roof left and
+    the blister vanishes on its own — a capsule stays sealed.
+    """
+    flat_hi = HALF_LEN - prop["nose"] - 0.35
+    flat_lo = -NOSE_START + 0.5
+    length = min(BLISTER_MAX_LEN, flat_hi - flat_lo)
+    if length < BLISTER_MIN_LEN:
+        return
+    base = prop["roof"] - BLISTER_SINK
+    rings, arcs = 10, 7
+    verts, faces = [], []
+    for k in range(rings + 1):
+        u = flat_hi - length + length * k / rings
+        env = math.sin(math.pi * k / rings) ** 0.7     # domed ends
+        for j in range(arcs + 1):
+            a = math.pi * j / arcs
+            v = math.cos(a) * BLISTER_HALF * (0.35 + 0.65 * env)
+            z = base + (BLISTER_SINK + BLISTER_RISE) * math.sin(a) * env
+            verts.append(forward * iso.m(u) + across * iso.m(v)
+                         + up * iso.m(z))
+    for k in range(rings):
+        for j in range(arcs):
+            a = k * (arcs + 1) + j
+            b = a + arcs + 1
+            faces.append([a, a + 1, b + 1, b])
+    iso.new_mesh("blister", verts, faces, material)
 
 
 def build_doors(forward, across, up, count, mail, material, win_lo, win_hi):
@@ -252,37 +392,33 @@ def build_doors(forward, across, up, count, mail, material, win_lo, win_hi):
     1100ms. A mail van gets a single wide loading door and no windows at all —
     which is what tells the two apart at 50x25px, far more than colour.
     """
+    spots = door_spots(count, mail)
     if mail:
-        spots, width = [0.0], MAIL_DOOR_WIDTH
-        lo, hi = DOOR_LO, win_hi + 0.10
+        width, lo, hi = MAIL_DOOR_WIDTH, DOOR_LO, win_hi + 0.10
     else:
         width, lo, hi = DOOR_WIDTH, DOOR_LO, DOOR_HI
-        span = BODY_LENGTH * 0.30
-        spots = ([0.0] if count == 1
-                 else [(-1) ** i * span * (0.5 + i // 2) for i in range(count)][:count])
-        if count == 3:
-            spots = [-span, 0.0, span]
-        elif count == 2:
-            spots = [-span * 0.7, span * 0.7]
+    if SCULPTED_FLANKS:
+        # The panel sits just proud of its groove floor, still shy of the
+        # body wall: a pocket door, read as a dark slot in the flank.
+        depths = (BODY_HALF - 2 * GROOVE_DEPTH, BODY_HALF - GROOVE_DEPTH + 0.005)
+    else:
+        depths = (BODY_HALF - 0.04, BODY_HALF + DOOR_PROUD)
     for side in (-1.0, 1.0):
         for k, u in enumerate(spots):
             corners = [(u - width / 2, lo), (u + width / 2, lo),
                        (u + width / 2, hi), (u - width / 2, hi)]
             verts = []
-            for depth in (BODY_HALF - 0.04, BODY_HALF + DOOR_PROUD):
+            for depth in depths:
                 for du, dz in corners:
                     verts.append(forward * iso.m(du)
                                  + across * iso.m(side * depth)
                                  + up * iso.m(dz))
-            faces = [[0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4],
-                     [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]]
-            iso.new_mesh(f"door{side:+.0f}_{k}", verts, faces, material)
+            iso.new_mesh(f"door{side:+.0f}_{k}", verts, _BOX_FACES, material)
 
 
-def build_body(heading, variant: str = "middle", livery: str = "meridian",
-               mail: bool = False, speed: float = 500.0,
-               grade: str = "flagship") -> None:
-    """Loft the cross-section down the body and cap both ends.
+def build_body(heading, role: str = "car", livery: str = "meridian",
+               speed: float = 500.0, grade: str = "flagship") -> None:
+    """Loft the cross-section down the body, cap the ends, dress the role.
 
     `mail` blanks the window band to body colour — no windows is what reads as
     a mail van at 50x25px, far more than any change of hue would.
@@ -290,6 +426,9 @@ def build_body(heading, variant: str = "middle", livery: str = "meridian",
     forward = Vector((heading[0], heading[1], 0.0))
     across = Vector((-heading[1], heading[0], 0.0))
     up = Vector((0.0, 0.0, 1.0))
+
+    mail = role == "mail"
+    nosed = role in ("head", "tail")
 
     pal = LIVERIES[livery]
     glazing = pal["body"] if mail else pal["window"]
@@ -305,14 +444,26 @@ def build_body(heading, variant: str = "middle", livery: str = "meridian",
     prop = proportions(speed, grade)
     section = profile(prop)
     n = len(section)
-    us = stations(variant, prop["nose"])
+    shoulder = prop["shoulder"]
+    us = stations(role, prop["nose"])
+
+    grooves = []
+    if SCULPTED_FLANKS and role in ("car", "mail"):
+        half = (MAIL_DOOR_WIDTH if mail else DOOR_WIDTH) / 2 + GROOVE_MARGIN
+        grooves = [(s - half, s + half)
+                   for s in door_spots(prop["doors"], mail)]
+        # Rings on the pocket walls, so the recess is a step, not a smear.
+        us = sorted(set(us) | {round(e, 4) for lo, hi in grooves
+                               for e in (lo, hi, lo + 0.05, hi - 0.05)})
+    groove_scale = (BODY_HALF - GROOVE_DEPTH) / BODY_HALF
 
     verts, faces, face_materials = [], [], []
     for u in us:
-        if variant == "head" and u > 0.0:
+        if nosed and u > 0.0:
             width, height_factor = nose(u, prop["nose"])
         else:
             width, height_factor = chamfer(u)
+        pocket = grooves and in_groove(u, grooves)
         for v, w, _ in section:
             if w <= FLOOR:
                 # Skirts and the guideway channel never move: the body has to
@@ -321,19 +472,36 @@ def build_body(heading, variant: str = "middle", livery: str = "meridian",
             else:
                 height = FLOOR + (w - FLOOR) * height_factor
                 across_scale = width
+                if pocket and abs(v) >= BODY_HALF - 1e-6 \
+                        and w < shoulder - 1e-6:
+                    across_scale *= groove_scale
             verts.append(forward * iso.m(u) + across * iso.m(v * across_scale)
                          + up * iso.m(height))
 
+    # A commuter set gets its window band cut into segments; a flagship keeps
+    # the sleek continuous ribbon. Door count already encodes exactly that.
+    rhythm = SCULPTED_FLANKS and role == "car" and prop["doors"] >= 2
     for ring in range(len(us) - 1):
         base, nxt = ring * n, (ring + 1) * n
+        u_mid = (us[ring] + us[ring + 1]) / 2
         for i in range(n):
             j = (i + 1) % n
             faces.append([base + i, base + j, nxt + j, nxt + i])
-            face_materials.append(section[i][2])
+            mat = section[i][2]
+            w_i = section[i][1]
+            if role == "car" and mat == ACCENT and w_i > shoulder \
+                    and skylight_pane(u_mid):
+                mat = WINDOW    # skylight pane framed by the accent band
+            elif rhythm and mat == WINDOW and w_i <= shoulder \
+                    and window_gap(u_mid):
+                mat = BODY      # mullion between window segments
+            face_materials.append(mat)
 
     # The head's front cap is glazed: at 128px a dark tip is what reads as a
-    # windscreen and tells you which way the train is pointing.
-    nose_cap = WINDOW if variant == "head" else BODY
+    # windscreen and tells you which way the train is pointing. The tail gets
+    # the same geometry with the cap blanked — a blind rear, so a whole train
+    # reads directional instead of double-ended.
+    nose_cap = WINDOW if role == "head" else BODY
     for ring, order, material in ((0, list(range(n - 1, -1, -1)), BODY),
                                   (len(us) - 1, list(range(n)), nose_cap)):
         faces.append([ring * n + i for i in order])
@@ -343,8 +511,14 @@ def build_body(heading, variant: str = "middle", livery: str = "meridian",
     for poly, mat in zip(obj.data.polygons, face_materials):
         poly.material_index = mat
 
-    # Doors only on trailers; a head car is mostly nose and has no flank left.
-    if variant != "head":
+    trim = iso.make_material("trim", pal["skirt"], roughness=0.55,
+                             metallic=0.35)
+    if mail:
+        build_hatches(forward, across, up, prop, trim)
+    if nosed:
+        build_blister(forward, across, up, prop, trim)
+    else:
+        # Doors only on trailers; a head car is mostly nose and has no flank.
         door_mat = iso.make_material(
             "door", pal["window"] if not mail else pal["skirt"],
             roughness=0.35, metallic=0.25)
@@ -356,9 +530,9 @@ def parse_args():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     p = argparse.ArgumentParser()
     p.add_argument("--out", required=True)
-    p.add_argument("--variant", default="middle", choices=["middle", "head"])
+    p.add_argument("--role", default="car",
+                   choices=["car", "mail", "head", "tail"])
     p.add_argument("--livery", default="meridian", choices=sorted(LIVERIES))
-    p.add_argument("--mail", action="store_true")
     p.add_argument("--speed", type=float, default=500.0)
     p.add_argument("--grade", default="flagship", choices=sorted(GRADES))
     p.add_argument("--samples", type=int, default=96)
@@ -371,11 +545,11 @@ def main() -> None:
     os.makedirs(args.out, exist_ok=True)
     for (row, col), direction in sorted(layout.VEHICLE_PLAN.items()):
         iso.setup(supersample=args.supersample, samples=args.samples)
-        build_body(layout.VEHICLE_HEADING[direction], args.variant,
-                   args.livery, args.mail, args.speed, args.grade)
+        build_body(layout.VEHICLE_HEADING[direction], args.role,
+                   args.livery, args.speed, args.grade)
         iso.render_to(os.path.join(args.out, f"cell_{row}_{col}.png"))
-        tag = f"{args.livery}-{args.variant}" + ("-mail" if args.mail else "")
-        print(f"[maglev] rendered {tag} {direction} -> {row}.{col}")
+        print(f"[maglev] rendered {args.livery}-{args.role} "
+              f"{direction} -> {row}.{col}")
 
 
 if __name__ == "__main__":

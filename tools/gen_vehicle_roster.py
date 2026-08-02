@@ -116,7 +116,7 @@ ROSTER = [
 # own speed and grade, so no two share a silhouette. Sheets live in
 # src/maglev/images/, so the reference is relative to the vehicles/ dat dir.
 SHEET = {"head": "../images/maglev_head_{tag}", "car": "../images/maglev_car_{tag}",
-         "mail": "../images/maglev_mail_{tag}"}
+         "mail": "../images/maglev_mail_{tag}", "tail": "../images/maglev_tail_{tag}"}
 DIRS = ["w", "nw", "n", "ne", "e", "se", "s", "sw"]
 CELL = {"w": "1.0", "nw": "1.1", "n": "1.2", "ne": "1.3",
         "e": "1.4", "se": "1.5", "s": "1.6", "sw": "1.7"}
@@ -164,6 +164,7 @@ def write_set(out_dir, company, speed, variant, intro):
     head_sheet = SHEET["head"].format(tag=tag)
     car_sheet = SHEET["car"].format(tag=tag)
     mail_sheet = SHEET["mail"].format(tag=tag)
+    tail_sheet = SHEET["tail"].format(tag=tag)
 
     common = (f"waytype=maglev_track\nengine_type=electric\n"
               f"speed={speed}\nlength=12\nsmoke=-1\n"
@@ -214,8 +215,9 @@ def write_set(out_dir, company, speed, variant, intro):
         f"constraint[next][2]={stem}_Tail\n"
         + images(mail_sheet))
 
-    # The tail is the head's artwork with every direction swapped for its
-    # opposite, so the nose points back down the train. No second render.
+    # The tail sheet is the head rendered with a blanked windscreen, used with
+    # every direction swapped for its opposite so the nose points back down
+    # the train — a train has a lit front and a blind back.
     files[f"{stem}_tail.dat"] = (
         f"obj=vehicle\nname={stem}_Tail\ncopyright=Aleksander Kwiatkowski\n{common}sound=-1\n"
         f"freight=Passagiere\npayload={s['head_pax']}\n"
@@ -226,7 +228,7 @@ def write_set(out_dir, company, speed, variant, intro):
         f"constraint[prev][1]={stem}_Mail\n"
         f"constraint[prev][2]={stem}_Head\n"
         f"constraint[next][0]=none\n"
-        + images(head_sheet, reversed_dirs=True))
+        + images(tail_sheet, reversed_dirs=True))
 
     for name, body in files.items():
         (out_dir / name).write_text(body)

@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Render and pack every trainset in the roster.
 
-Drives Blender once per sheet — head, passenger car and mail van for each of
-the sixteen trainsets in `gen_vehicle_roster.ROSTER` — then packs each into a
-vehicle sheet. Proportions come from the set's own speed and grade, so no two
-trainsets share a silhouette.
+Drives Blender once per sheet — head, tail, passenger car and mail van for
+each of the sixteen trainsets in `gen_vehicle_roster.ROSTER` — then packs each
+into a vehicle sheet. Proportions come from the set's own speed and grade, so
+no two trainsets share a silhouette. The tail is the head with a blanked
+windscreen, rendered separately so a train reads directional.
 
-    python3 tools/render_fleet.py                  # everything, ~8 minutes
+    python3 tools/render_fleet.py                  # everything, ~12 minutes
     python3 tools/render_fleet.py --only Meridian  # one manufacturer
     python3 tools/render_fleet.py --samples 32     # rough and quick
 """
@@ -23,16 +24,14 @@ import gen_vehicle_roster as roster  # noqa: E402
 
 BUILDER = "tools/blender/build_maglev_vehicle.py"
 PACKER = "tools/assemble_sheet.py"
-PARTS = (("head", "head", False), ("car", "middle", False), ("mail", "middle", True))
+PARTS = ("head", "tail", "car", "mail")
 
 
-def render(part, variant, mail, company, speed, grade, cells, samples, blender):
+def render(role, company, speed, grade, cells, samples, blender):
     cmd = [blender, "--background", "--python", BUILDER, "--",
-           "--variant", variant, "--livery", roster.COMPANY_LIVERY[company],
+           "--role", role, "--livery", roster.COMPANY_LIVERY[company],
            "--grade", grade, "--speed", str(speed),
            "--out", str(cells), "--samples", str(samples)]
-    if mail:
-        cmd.append("--mail")
     subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL,
                    stderr=subprocess.DEVNULL)
 
@@ -57,11 +56,11 @@ def main() -> None:
     done = 0
 
     for company, speed, grade, _intro in sets:
-        for part, variant, mail in PARTS:
+        for part in PARTS:
             tag = f"{roster.COMPANY_LIVERY[company]}{speed}"
             cells = work / f"{part}_{tag}"
             cells.mkdir(parents=True, exist_ok=True)
-            render(part, variant, mail, company, speed, grade,
+            render(part, company, speed, grade,
                    cells, args.samples, args.blender)
             sheet = out / f"maglev_{part}_{tag}.png"
             subprocess.run([args.python, PACKER, str(cells), "-o", str(sheet),

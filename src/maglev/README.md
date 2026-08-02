@@ -100,10 +100,20 @@ by `tools/gen_vehicle_roster.py` (`*_head`, `*_car`, `*_mail`, `*_tail`):
 the powered head, unpowered passenger and mail trailers, and the tail.
 Valid formations are head + tail, or head + any mix of trailers + tail.
 
-The tail has **no artwork of its own**: it points at the head sheet with
-every direction swapped for its opposite, so the nose faces back down the
-train. A tail car is a head car seen the other way round, and rendering a
-second sheet for it would only invite the two to drift apart.
+All four roles share one body loft; the roof tells them apart, because the
+30-degree camera shows far more roof than flank. Passenger cars carry glazed
+skylight panes framed by the accent crown band; mail vans have a sealed crown
+with grey roof hatches (and no windows at all); the head carries a dorsal
+power blister on whatever flat roof its nose leaves — fast sets grow the nose
+until the blister disappears, so a vacuum capsule stays smooth. Door pockets
+are recessed and commuter window bands segmented, both behind the
+`SCULPTED_FLANKS` flag in `tools/blender/build_maglev_vehicle.py` for easy
+revert.
+
+The tail is the head's geometry with the windscreen blanked to body colour,
+rendered as its own sheet and used with every direction swapped for its
+opposite, so the nose faces back down the train: a train has a lit front and
+a blind back.
 
 The nose is a wedge rather than a cone. The body wraps its guideway all the way
 to the tip, so the skirts cannot pull in — narrowing them would drive the
