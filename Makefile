@@ -10,7 +10,7 @@ PAK_DIR ?= $(GAME_REPO)/pak128
 EVALUATION_USER_DIR ?= evaluation/user
 SOURCE_DIR := src/maglev
 OUTPUT := dist/maglev-addon.pak
-DAT_FILES := $(SOURCE_DIR)/maglev_depot.dat $(SOURCE_DIR)/maglev_station.dat $(SOURCE_DIR)/maglev_test_train.dat $(SOURCE_DIR)/maglev_track_400.dat
+DAT_FILES := $(wildcard $(SOURCE_DIR)/*.dat) $(wildcard $(SOURCE_DIR)/vehicles/*.dat)
 
 RUN_ARGS ?= -addons -startyear 2000 -lang en -screensize 1024x768 -nomidi
 
@@ -18,14 +18,16 @@ RUN_ARGS ?= -addons -startyear 2000 -lang en -screensize 1024x768 -nomidi
 # procedural 2D one, and a Blender pipeline. See tools/README.md.
 PYTHON ?= python3
 BLENDER ?= blender
-TRACK_SHEET := $(SOURCE_DIR)/maglev_track.png
+# Sprite sheets live apart from the .dat files that reference them.
+IMAGES_DIR := $(SOURCE_DIR)/images
+TRACK_SHEET := $(IMAGES_DIR)/maglev_track.png
 CELLS_DIR := build/cells
 RENDER_SAMPLES ?= 96
 REFERENCE_SHEET := upstream/infrastructure/rail_tracks/rail_400_tracks.png
 
 .DEFAULT_GOAL := build
 .PHONY: build makeobj install run status art \
-        track-2d track-3d track-cells station depot vehicle head tube \
+        track-2d track-3d track-cells station depot fleet tube \
         iso-selftest preview
 
 status:
@@ -76,21 +78,14 @@ station depot:
 	$(BLENDER) --background --python tools/blender/build_maglev_buildings.py -- \
 		--object $@ --out build/$@ --samples $(RENDER_SAMPLES)
 	$(PYTHON) tools/assemble_sheet.py build/$@ \
-		-o "$(SOURCE_DIR)/maglev_$@.png" --sheet $@
+		-o "$(IMAGES_DIR)/maglev_$@.png" --sheet $@
 
-# Rolling stock, each in its eight travel directions. The tail car reuses the
-# head sheet with the directions swapped, so it has no render of its own.
-vehicle:
-	$(BLENDER) --background --python tools/blender/build_maglev_vehicle.py -- \
-		--variant middle --out build/vehicle --samples $(RENDER_SAMPLES)
-	$(PYTHON) tools/assemble_sheet.py build/vehicle \
-		-o "$(SOURCE_DIR)/maglev_test_train.png" --sheet vehicle
-
-head:
-	$(BLENDER) --background --python tools/blender/build_maglev_vehicle.py -- \
-		--variant head --out build/head --samples $(RENDER_SAMPLES)
-	$(PYTHON) tools/assemble_sheet.py build/head \
-		-o "$(SOURCE_DIR)/maglev_head.png" --sheet vehicle
+# Rolling stock: every trainset in the roster, each part in its eight travel
+# directions. The tail car reuses the head sheet with the directions swapped,
+# so it has no render of its own.
+fleet:
+	$(PYTHON) tools/render_fleet.py --out "$(IMAGES_DIR)" \
+		--samples $(RENDER_SAMPLES) --blender "$(BLENDER)"
 
 # Tier 4: the enclosed glazed guideway. Two full ribi sets — back and front —
 # so the sheet is four 5-row blocks, and it is written RGBA because glass
@@ -99,9 +94,9 @@ tube:
 	$(BLENDER) --background --python tools/blender/build_maglev_track.py -- \
 		--out build/tube --season both --enclosure tube --samples $(RENDER_SAMPLES)
 	$(PYTHON) tools/assemble_sheet.py build/tube \
-		-o "$(SOURCE_DIR)/maglev_tube.png" --sheet tube
+		-o "$(IMAGES_DIR)/maglev_tube.png" --sheet tube
 
-art: track-3d station depot vehicle head tube
+art: track-3d station depot fleet tube
 
 # Assert the Blender camera still lands on pak128's pixel grid. Run this after
 # touching anything in tools/blender/simutrans_iso.py.

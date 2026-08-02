@@ -19,9 +19,9 @@ deck near the upper edges) fall back to a 50% coverage test. That test is
 limited to a band above the tile so stray geometry swept past the tile edge
 cannot bleed into a neighbour.
 
-    python3 tools/assemble_sheet.py build/cells -o src/maglev/maglev_track.png
+    python3 tools/assemble_sheet.py build/cells -o src/maglev/images/maglev_track.png
     python3 tools/assemble_sheet.py build/cells -o /tmp/sheet.png \
-        --base src/maglev/maglev_track.png     # fill gaps from the 2D sheet
+        --base src/maglev/images/maglev_track.png     # fill gaps from the 2D sheet
 """
 
 from __future__ import annotations

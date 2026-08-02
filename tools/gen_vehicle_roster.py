@@ -113,9 +113,10 @@ ROSTER = [
 ]
 
 # One sheet per trainset, not per company: proportions are driven by the set's
-# own speed and grade, so no two share a silhouette.
-SHEET = {"head": "maglev_head_{tag}", "car": "maglev_car_{tag}",
-         "mail": "maglev_mail_{tag}"}
+# own speed and grade, so no two share a silhouette. Sheets live in
+# src/maglev/images/, so the reference is relative to the vehicles/ dat dir.
+SHEET = {"head": "../images/maglev_head_{tag}", "car": "../images/maglev_car_{tag}",
+         "mail": "../images/maglev_mail_{tag}"}
 DIRS = ["w", "nw", "n", "ne", "e", "se", "s", "sw"]
 CELL = {"w": "1.0", "nw": "1.1", "n": "1.2", "ne": "1.3",
         "e": "1.4", "se": "1.5", "s": "1.6", "sw": "1.7"}

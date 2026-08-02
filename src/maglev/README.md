@@ -1,8 +1,10 @@
 # Maglev Source Assets
 
-Editable maglev `.dat` files and source images live in this directory. Only the
-PNG files directly here are compiled; the asset Makefile writes generated
-`.pak` files to `dist/`.
+Editable maglev `.dat` files and source images live in this directory, kept
+apart: infrastructure `.dat` files sit at the root, the generated vehicle
+`.dat` files in `vehicles/`, and every sprite sheet in `images/` — dat files
+reference them as `images/...` (root) or `../images/...` (vehicles). The asset
+Makefile writes generated `.pak` files to `dist/`.
 
 All original maglev assets in this directory use Artistic License 2.0.
 
@@ -76,8 +78,7 @@ All three are original artwork now, rendered from the same Blender rig:
 ```sh
 make station     # two platforms flanking the guideway
 make depot       # barrel-vault maintenance hangar
-make vehicle     # the middle passenger section, eight travel directions
-make head        # the powered nose car
+make fleet       # every trainset in the roster, eight travel directions each
 make art         # all of the above plus the track
 ```
 
@@ -94,17 +95,12 @@ body that read as a fat white pill beside everything else.
 
 ## Rolling stock
 
-Three vehicle types make up a train:
+Four vehicle types make up a train, generated per trainset into `vehicles/`
+by `tools/gen_vehicle_roster.py` (`*_head`, `*_car`, `*_mail`, `*_tail`):
+the powered head, unpowered passenger and mail trailers, and the tail.
+Valid formations are head + tail, or head + any mix of trailers + tail.
 
-| | `.dat` | role |
-|---|---|---|
-| Head | `maglev_head.dat` | powered nose car, nothing couples ahead of it |
-| Middle | `maglev_test_train.dat` | unpowered trailer, both ends chamfered |
-| Tail | `maglev_tail.dat` | nose car reversed, nothing couples behind it |
-
-Valid formations are head + tail, or head + any number of middles + tail.
-
-The tail has **no artwork of its own**: it points at `maglev_head.png` with
+The tail has **no artwork of its own**: it points at the head sheet with
 every direction swapped for its opposite, so the nose faces back down the
 train. A tail car is a head car seen the other way round, and rendering a
 second sheet for it would only invite the two to drift apart.
@@ -132,11 +128,6 @@ Regenerate it alongside the roster.
   split by eye.
 - Nothing has been run in the game yet. Everything is verified by compositing
   the sheets the way Simutrans layers them, plus a clean `makeobj` pack.
-- **The 1000 km/h tube is capped by rolling stock**: the fastest vehicle is
-  400 km/h, and a way only limits speed, so the tier does nothing until faster
-  pods exist.
-- The open tiers are still named 160/250/400. The agreed ladder renames them to
-  300/500/700 with 2000 and 4000 tubes above; only tier 4 is built so far.
 - Junction tiles simply let the two tubes intersect. It reads acceptably as a
   cross vault, but a proper junction treatment would be better.
 

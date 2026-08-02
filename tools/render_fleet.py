@@ -40,7 +40,7 @@ def render(part, variant, mail, company, speed, grade, cells, samples, blender):
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--out", default="src/maglev/vehicles")
+    parser.add_argument("--out", default="src/maglev/images")
     parser.add_argument("--work", default="build/fleet")
     parser.add_argument("--samples", type=int, default=96)
     parser.add_argument("--blender", default="blender")

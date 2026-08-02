@@ -1,7 +1,7 @@
 # Artwork tooling
 
 Two renderers produce the maglev track sheet. They share the cell layout and
-the sprite-sheet conventions, so either can fill `src/maglev/maglev_track.png`
+the sprite-sheet conventions, so either can fill `src/maglev/images/maglev_track.png`
 and the `.dat` files never change.
 
 | | 2D (`render_maglev_track.py`) | 3D (`blender/`) |

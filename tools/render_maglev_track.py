@@ -41,7 +41,7 @@ looking at the girder's front wall.
 
 Usage
 -----
-    python3 tools/render_maglev_track.py -o src/maglev/maglev_track.png
+    python3 tools/render_maglev_track.py -o src/maglev/images/maglev_track.png
     python3 tools/render_maglev_track.py -o /tmp/preview.png --preview /tmp/zoom.png
 """
 
@@ -559,7 +559,7 @@ def build_sheet() -> Image.Image:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("-o", "--out", default="src/maglev/maglev_track.png")
+    parser.add_argument("-o", "--out", default="src/maglev/images/maglev_track.png")
     parser.add_argument("--preview", help="also write a 4x zoom of a few key cells")
     args = parser.parse_args()
 

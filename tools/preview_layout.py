@@ -14,10 +14,10 @@ sprites by cell number is how a train ends up drawn ninety degrees across its
 own track — `place_consist` picks the cell from the direction of travel and
 raises if that direction is not something the way underneath actually offers.
 
-    python3 tools/preview_layout.py src/maglev/maglev_track.png -o /tmp/map.png
+    python3 tools/preview_layout.py src/maglev/images/maglev_track.png -o /tmp/map.png
     python3 tools/preview_layout.py A.png B.png -o /tmp/compare.png --zoom 2
-    python3 tools/preview_layout.py src/maglev/maglev_track.png -o /tmp/t.png \
-        --consist src/maglev/vehicles --set meridian500
+    python3 tools/preview_layout.py src/maglev/images/maglev_track.png -o /tmp/t.png \
+        --consist src/maglev/images --set meridian500
 """
 
 from __future__ import annotations
