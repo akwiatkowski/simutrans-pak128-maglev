@@ -31,7 +31,7 @@ REFERENCE_SHEET := upstream/infrastructure/rail_tracks/rail_400_tracks.png
 .DEFAULT_GOAL := build
 .PHONY: build makeobj check install run status art \
         track-2d track-3d station depot concourse fleet tube \
-        iso-selftest preview
+        readme-trains iso-selftest preview
 
 status:
 	@printf 'Source: %s\n' '$(SOURCE_DIR)'
@@ -66,6 +66,11 @@ run: install
 	"$(GAME_BINARY)" -set_basedir "$(abspath $(BASE_DIR))" -set_pakdir "$(abspath $(PAK_DIR))" -set_userdir "$(abspath $(EVALUATION_USER_DIR))" $(RUN_ARGS)
 
 # --- artwork ---------------------------------------------------------------
+
+# Per-trainset README showcases + economics paragraphs, injected between the
+# trains:begin/end markers in src/maglev/README.md. Pillow only, no Blender.
+readme-trains:
+	$(PYTHON) tools/render_readme_trains.py
 
 # Procedural 2D sheet. Seconds to run, no Blender needed.
 track-2d:
