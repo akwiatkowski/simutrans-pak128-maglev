@@ -5,8 +5,10 @@ Standalone pak128 addon source for a playable maglev prototype.
 This repository is intentionally separate from the Simutrans engine and from
 the downloaded base `pak128/` directory. Editable assets belong under
 `src/maglev/`. Generated `.pak` files belong under `dist/` and are ignored.
-The official pak128 source checkout is kept under `upstream/` as a local
-reference and is intentionally not vendored into this repository.
+The official pak128 source is kept under `upstream/` as a local reference —
+a blobless sparse clone holding only the directories the pipeline consults
+(`git -C upstream sparse-checkout add <dir>` fetches more on demand) — and is
+intentionally not vendored into this repository.
 
 ## Current Milestone
 
@@ -18,8 +20,8 @@ The first milestone is one complete passenger service:
 - one passenger maglev train
 - one mostly straight test route long enough to show top speed
 
-The first graphics pass will use placeholders or reused pak128-style assets.
-Original isometric artwork comes after the data and packaging pipeline works.
+All artwork is original and generated: see `tools/README.md` for the 2D and
+Blender render pipelines that produce every sheet under `src/maglev/images/`.
 
 ## Build
 

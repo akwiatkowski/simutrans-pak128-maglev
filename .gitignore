@@ -10,12 +10,11 @@
 /evaluation/
 
 # pak128 material used only as measurement reference — NOT redistributed.
-# `upstream/` is a checkout of the official pak128 source; `reference/` holds
-# way files extracted from an installed pak128; `src/maglev/versions/` holds
-# early snapshots that were literal copies of pak128 rail artwork
-# (v0-rail-placeholder is pixel-for-pixel identical to rail_400_tracks.png).
+# `upstream/` is a sparse checkout of the official pak128 source;
+# `src/maglev/versions/` holds early snapshots that were literal copies of
+# pak128 rail artwork (v0-rail-placeholder is pixel-for-pixel identical to
+# rail_400_tracks.png).
 /upstream/
-/reference/
 /src/maglev/versions/
 __pycache__/
 *.pyc
