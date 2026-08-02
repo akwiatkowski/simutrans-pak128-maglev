@@ -10,23 +10,32 @@ All original maglev assets in this directory use Artistic License 2.0.
 
 ## Track
 
-`maglev_track.png` is **generated**, not hand-edited. Two renderers produce it,
-both writing the same 8x11 cell layout that pak128's rail sets use, so the
-`.dat` files work with either:
+The track sheets are **generated**, not hand-edited. Each open tier has its
+own sheet — `maglev_track_{300,500,700}.png` — rendered by Blender from
+`TRACK_TIERS` in the builder; the 2D renderer keeps feeding the shared
+`maglev_track.png`, which serves as the fallback base for failed cells and
+quick iteration. All use the same 8x11 cell layout as pak128's rail sets:
 
 ```sh
 make track-2d     # procedural 2D renderer, seconds
-make track-3d     # Blender render + pack, ~2 minutes
+make track-3d     # Blender render + pack, all three tiers, ~6 minutes
 ```
 
 See `tools/README.md` for how the pak128 grid, direction mapping, ramp
 projections and lighting were measured off the reference rail sheet, and for
 the Blender camera parameters. Edit `tools/render_maglev_track.py` or
-`tools/blender/build_maglev_track.py` rather than the PNG.
+`tools/blender/build_maglev_track.py` rather than the PNGs.
 
-The three open tiers — 160, 250 and 400 km/h — share the one sheet and differ
-by `topspeed`, cost and maintenance in their `.dat` files. Each has its own
-toolbar icon in row 0 so they can be told apart when building. The sheet
+Tier character follows the tubes' law — escalation is density of engineering —
+run so the open ladder converges toward the tube. The 300 is raw site-cast
+concrete: heavy segment joints, exposed stator packs dashed along the guidance
+slots, warm in tone. The 500 is the seamless commercial standard with a cable
+conduit along each flank. The 700 grows a flared aerodynamic skirt and low
+glass wind fences on the deck edges — the first 40cm of the enclosure the
+1000 tier completes. Winter tells the same story: unheated beams vanish under
+the same snow as the apron (the 300's slots fill with snow between the stator
+packs), while the 700's powered deck stays dark — a wet black ribbon through
+a white map. Each tier keeps its own toolbar icon in row 0, and every sheet
 carries winter tiles as well as summer ones.
 
 ## Speed ladder
@@ -36,16 +45,14 @@ Way tiers and vehicle speeds are deliberately **staggered** — line speed is
 
 | Tier | Speed | From | Sheet |
 |---|---|---|---|
-| open | 300 | 2000 | `maglev_track.png` |
-| open | 500 | 2014 | `maglev_track.png` |
-| open | 700 | 2032 | `maglev_track.png` |
+| open | 300 | 2000 | `maglev_track_300.png` |
+| open | 500 | 2014 | `maglev_track_500.png` |
+| open | 700 | 2032 | `maglev_track_700.png` |
 | tube | 1000 | 2080 | `maglev_tube.png` |
 | tube | 2000 | 2100 | `maglev_tube2000.png` |
 | tube | 4000 | 2165 | `maglev_tube4000.png` |
 
-The three open tiers share one sheet and differ only by `topspeed`, cost and
-intro year, each with its own toolbar icon. See the plan for why the ladder is
-staggered against the vehicle roster.
+See the plan for why the ladder is staggered against the vehicle roster.
 
 ## Enclosed guideway (tiers 4-6)
 
