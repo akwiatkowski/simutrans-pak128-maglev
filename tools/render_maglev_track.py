@@ -453,12 +453,25 @@ def render_icon(speed: int) -> np.ndarray:
                 if bit == "1":
                     img[oy + row, ox + i * 4 + col] = (24, 24, 28)
 
-    # A slice of guideway under the sign, so the icon reads as maglev and not
-    # as another rail speed class.
+    # A slice of guideway under the sign, styled per tier so the build menu
+    # is tellable at a glance: warm toothed 300, cool 500 with its orange
+    # tray, pale 700 with lit edges. Colours are the sheet palettes' sRGB
+    # renders; the 700's blue sits one step off the reserved light so the
+    # icon is not remapped as a player colour.
     img[27:31, 2:30] = SUMMER["apron"]
-    img[27:29, 6:26] = SUMMER["beam_stator"]
-    img[28:29, 6:26] = SUMMER["beam_accent"]
-    img[29:31, 6:26] = SUMMER["wall_dark"]
+    if speed == 300:
+        img[27:30, 6:26] = (187, 176, 148)          # warm site-cast sand
+        for x in range(6, 26, 5):                   # stator teeth
+            img[28:30, x:x + 3] = (44, 46, 50)
+        img[30:31, 6:26] = (124, 112, 90)
+    elif speed == 500:
+        img[27:30, 6:26] = (161, 168, 179)          # cool precast
+        img[27:28, 8:24] = (62, 66, 72)             # continuous slots
+        img[30:31, 6:26] = (201, 106, 46)           # orange cable tray
+    else:
+        img[27:31, 6:26] = (213, 219, 226)          # pale shell
+        img[27:28, 6:26] = (127, 155, 240)          # lit deck edges
+        img[30:31, 6:26] = (127, 155, 240)
     return img
 
 

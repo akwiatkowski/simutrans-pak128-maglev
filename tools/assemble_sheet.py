@@ -169,7 +169,22 @@ def fill_holes(rgb: np.ndarray, valid: np.ndarray, keep: np.ndarray) -> np.ndarr
 
 
 def build_cell(path: pathlib.Path, spec, factor: int) -> np.ndarray:
-    rgb, alpha = downsample(Image.open(path), factor)
+    # The 700's lit edge rails render as the magenta marker, exactly like the
+    # tube's light cove: clean it to the reserved colour at full resolution
+    # (so no magenta fringe survives the box average), then stamp the exact
+    # reserved value wherever the marker dominated a pixel — averaging would
+    # have shifted it off Simutrans' special-colour table.
+    img = np.asarray(Image.open(path).convert("RGBA"))
+    r = img[..., 0].astype(np.int16)
+    g = img[..., 1].astype(np.int16)
+    b = img[..., 2].astype(np.int16)
+    flag = ((r - g) > 22) & ((b - g) > 22)
+    cleaned = img.copy()
+    cleaned[flag, 0:3] = np.array(LIGHT_BLUE, dtype=np.uint8)
+    n = layout.CELL
+    cover = flag.reshape(n, factor, n, factor).mean(axis=(1, 3))
+
+    rgb, alpha = downsample(Image.fromarray(cleaned, "RGBA"), factor)
 
     ground = ground_mask(spec)
     airspace = dilate_up(ground, MAX_OBJECT_PX)
@@ -179,7 +194,12 @@ def build_cell(path: pathlib.Path, spec, factor: int) -> np.ndarray:
     out = np.empty((layout.CELL, layout.CELL, 3), dtype=np.uint8)
     out[:, :] = layout.KEY
     out[keep] = np.round(rgb[keep] * 255.0).astype(np.uint8)
-    return avoid_special_colours(out)
+
+    # A thin lit rail covers less of a pixel than the tube's cove does, so
+    # the stamp threshold sits lower than the tube packer's 0.5.
+    lit = keep & (cover >= 0.35)
+    out[lit] = LIGHT_BLUE
+    return avoid_special_colours(out, protect=lit)
 
 
 # --------------------------------------------------------------------------
