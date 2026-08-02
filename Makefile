@@ -20,14 +20,17 @@ PYTHON ?= python3
 BLENDER ?= blender
 # Sprite sheets live apart from the .dat files that reference them.
 IMAGES_DIR := $(SOURCE_DIR)/images
-TRACK_SHEET := $(IMAGES_DIR)/maglev_track.png
+# The 2D renderer keeps feeding maglev_track.png: it is the fallback base the
+# per-tier 3D sheets fill failed cells from, and the quick-iteration preview.
+TRACK_BASE := $(IMAGES_DIR)/maglev_track.png
+TRACK_TIER_LIST := 300 500 700
 CELLS_DIR := build/cells
 RENDER_SAMPLES ?= 96
 REFERENCE_SHEET := upstream/infrastructure/rail_tracks/rail_400_tracks.png
 
 .DEFAULT_GOAL := build
-.PHONY: build makeobj install run status art \
-        track-2d track-3d track-cells station depot fleet tube \
+.PHONY: build makeobj check install run status art \
+        track-2d track-3d station depot fleet tube \
         iso-selftest preview
 
 status:
@@ -39,7 +42,13 @@ status:
 makeobj:
 	@test -x "$(MAKEOBJ)" || { echo "Missing makeobj: $(MAKEOBJ)"; exit 1; }
 
-build: makeobj
+# Validate sources before makeobj sees them. Every check here corresponds to a
+# bug that has actually shipped: a renamed sheet the dat generator did not
+# follow, an unconverted marker colour, and reserved colours in the icon row.
+check:
+	$(PYTHON) tools/check_assets.py
+
+build: makeobj check
 	@test -n "$(DAT_FILES)" || { echo "No .dat files found in $(SOURCE_DIR)"; exit 1; }
 	mkdir -p dist
 	cd "$(SOURCE_DIR)" && "$(abspath $(MAKEOBJ))" PAK128 "$(abspath $(OUTPUT))" *.dat vehicles/
@@ -60,17 +69,19 @@ run: install
 
 # Procedural 2D sheet. Seconds to run, no Blender needed.
 track-2d:
-	$(PYTHON) tools/render_maglev_track.py -o "$(TRACK_SHEET)"
+	$(PYTHON) tools/render_maglev_track.py -o "$(TRACK_BASE)"
 
-# Blender: render every cell, then pack them into the sheet. Falls back to
-# whatever is already in the sheet for cells that failed to render.
-track-cells:
-	$(BLENDER) --background --python tools/blender/build_maglev_track.py -- \
-		--out "$(CELLS_DIR)" --season both --samples $(RENDER_SAMPLES)
-
-track-3d: track-cells
-	$(PYTHON) tools/assemble_sheet.py "$(CELLS_DIR)" -o "$(TRACK_SHEET)" \
-		--base "$(TRACK_SHEET)"
+# Blender: render every cell for each open tier, then pack each into its
+# sheet. Cells that failed to render fall back to the 2D base sheet.
+track-3d:
+	for t in $(TRACK_TIER_LIST); do \
+		$(BLENDER) --background --python tools/blender/build_maglev_track.py -- \
+			--out "$(CELLS_DIR)$$t" --season both --tier $$t \
+			--samples $(RENDER_SAMPLES) && \
+		$(PYTHON) tools/assemble_sheet.py "$(CELLS_DIR)$$t" \
+			-o "$(IMAGES_DIR)/maglev_track_$$t.png" --base "$(TRACK_BASE)" \
+		|| exit 1; \
+	done
 
 # Stop and depot. Both are buildings: two orientations, each split into a back
 # image drawn before vehicles and a front image drawn after.
@@ -106,5 +117,5 @@ iso-selftest:
 # Lay the tiles out as a small map to check they join up at 100% zoom, with
 # pak128's own 400km/h rail underneath for comparison.
 preview:
-	$(PYTHON) tools/preview_layout.py "$(TRACK_SHEET)" "$(REFERENCE_SHEET)" \
+	$(PYTHON) tools/preview_layout.py "$(IMAGES_DIR)/maglev_track_300.png" "$(REFERENCE_SHEET)" \
 		-o build/preview.png

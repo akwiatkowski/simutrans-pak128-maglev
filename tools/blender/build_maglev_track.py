@@ -118,8 +118,61 @@ PALETTE = {
 }
 
 
-def profile_world():
-    return [(iso.m(p), iso.m(h)) for p, h in PROFILE_M]
+# --------------------------------------------------------------------------
+# Open-guideway tiers. The tubes' law — escalation is density of engineering —
+# run so the ladder converges toward the tube: 300 is raw site-cast concrete
+# with visible beam joints and exposed stator packs; 500 is the seamless
+# commercial standard with a cable conduit on the flank; 700 grows aerodynamic
+# skirts and low glass wind fences — the first 40cm of the enclosure that the
+# 1000 tier finally completes.
+# --------------------------------------------------------------------------
+
+TRACK_TIERS = {
+    300: dict(girder=(0.655, 0.628, 0.572),   # warm utilitarian concrete
+              girder_seams=0.32, seam_period=8.0, seam_width=0.18,
+              slot_seams=0.55, snow_slots=True,
+              conduit=False, fairing=False, fence=False, heated_deck=False),
+    500: dict(girder=(0.610, 0.625, 0.645),   # the cool cast standard
+              girder_seams=0.06, seam_period=16.0, seam_width=0.05,
+              slot_seams=0.0, snow_slots=False,
+              conduit=True, fairing=False, fence=False, heated_deck=False),
+    700: dict(girder=(0.665, 0.685, 0.712),   # lighter engineered shell
+              girder_seams=0.03, seam_period=32.0, seam_width=0.04,
+              slot_seams=0.0, snow_slots=False,
+              conduit=False, fairing=True, fence=True, heated_deck=True),
+}
+
+# The beam under an enclosed tube keeps the pre-tier standard look; its
+# character comes from the tube around it, not the concrete inside.
+TUBE_BEAM = dict(girder=None, girder_seams=0.10, seam_period=4.0,
+                 seam_width=0.07, slot_seams=0.0, snow_slots=False,
+                 conduit=False, fairing=False, fence=False, heated_deck=False)
+
+STATOR_PITCH = 1.2        # metres between exposed stator packs (tier 300)
+STATOR_JOINT = 0.34       # width of the gap between packs
+
+CONDUIT_LO, CONDUIT_HI = 0.30, 0.46   # cable duct on the girder flank (500)
+CONDUIT_PROUD = 0.07
+
+FENCE_TOP = 0.42          # low glass wind fence above the deck edge (700)
+FENCE_THICK = 0.05
+FENCE_INSET = 0.06
+
+# Tier 700 fills the deck overhang with a flared skirt: same deck, same
+# slots, but the exposed underside notch becomes a smooth shroud.
+FAIRING_HALF = GIRDER_HALF + 0.30
+_FAIRING_RIGHT = RIGHT_HALF[:8] + [
+    (DECK_HALF, DECK_TOP - 0.10),
+    (FAIRING_HALF, 0.20),
+    (FAIRING_HALF, 0.0),
+]
+FAIRING_M = [(-p, h) for p, h in reversed(_FAIRING_RIGHT)] + _FAIRING_RIGHT[1:]
+assert len(FAIRING_M) == len(PROFILE_M)   # SLOT_EDGES/DECK_EDGES stay valid
+
+
+def profile_world(fairing: bool = False):
+    points = FAIRING_M if fairing else PROFILE_M
+    return [(iso.m(p), iso.m(h)) for p, h in points]
 
 
 # --------------------------------------------------------------------------
@@ -303,16 +356,42 @@ def build_cell(spec, season, enclosure="none", part="back", tier=1000):
         build_tube(spec, season, near=True, tier=tier)
         return
 
+    cfg = TRACK_TIERS.get(tier, TUBE_BEAM)
+    winter = season == "winter"
+
+    # Winter is where the tiers tell their story: an unheated beam disappears
+    # under the same snow dusting as the apron, while the 700's powered deck
+    # stays dark — a wet black ribbon through a white map.
+    if cfg["girder"] is None:
+        girder_color = pal["girder"]
+    elif winter and not cfg["heated_deck"]:
+        girder_color = pal["girder"]
+    elif winter:
+        girder_color = tuple(c * 0.92 for c in cfg["girder"])   # wet, not lit
+    else:
+        girder_color = cfg["girder"]
+    deck_pal = PALETTE["summer"] if (winter and cfg["heated_deck"]) else pal
+    slot_color = deck_pal["slot"]
+    if winter and cfg["snow_slots"]:
+        # Snow settles between the exposed stator packs of the 300.
+        slot_color = tuple(0.45 * c + 0.55 * w
+                           for c, w in zip(slot_color, (0.86, 0.88, 0.89)))
+
     # The apron is panelled concrete like every other pak128 way; the girder
-    # carries the same grid, which reads along a run as segment joints.
+    # carries its own joint rhythm — heavy segment joints on the site-cast
+    # 300, nearly seamless on the engineered 700.
     apron_mat = iso.make_material("apron", pal["apron"], roughness=0.95,
                                   noise=0.30, seams=0.075, seam_period_m=4.0)
-    girder_mat = iso.make_material("girder", pal["girder"], roughness=0.72,
-                                   noise=0.12, seams=0.10, seam_period_m=4.0,
-                                   seam_width_m=0.07)
-    slot_mat = iso.make_material("slot", pal["slot"], roughness=0.45, metallic=0.55)
-    lev_mat = iso.make_material("levitation", pal["levitation"], roughness=0.35,
-                                metallic=0.35)
+    girder_mat = iso.make_material("girder", girder_color, roughness=0.72,
+                                   noise=0.12, seams=cfg["girder_seams"],
+                                   seam_period_m=cfg["seam_period"],
+                                   seam_width_m=cfg["seam_width"])
+    slot_mat = iso.make_material("slot", slot_color, roughness=0.45,
+                                 metallic=0.55, seams=cfg["slot_seams"],
+                                 seam_period_m=STATOR_PITCH,
+                                 seam_width_m=STATOR_JOINT)
+    lev_mat = iso.make_material("levitation", deck_pal["levitation"],
+                                roughness=0.35, metallic=0.35)
     girder_slots = [girder_mat, slot_mat, lev_mat]
 
     up = iso.ground_normal(shape)
@@ -334,10 +413,18 @@ def build_cell(spec, season, enclosure="none", part="back", tier=1000):
             iso.polygon("apron", shape,
                         [iso.CORNER_TOP, iso.CORNER_RIGHT,
                          iso.CORNER_BOTTOM, iso.CORNER_LEFT], apron_mat)
-    profile = profile_world()
+    profile = profile_world(cfg["fairing"])
 
     edge_materials = {e: 1 for e in SLOT_EDGES}
     edge_materials.update({e: 2 for e in DECK_EDGES})
+
+    duct_mat = fence_mat = None
+    if cfg["conduit"]:
+        duct_mat = iso.make_material("duct", (0.36, 0.38, 0.42),
+                                     roughness=0.50, metallic=0.60)
+    if cfg["fence"]:
+        fence_mat = iso.make_glass("fence", deck_pal["glass_tint"],
+                                   face_alpha=0.12, edge_alpha=0.65)
 
     for i, spec_run in enumerate(runs_for(spec)):
         lift = up * iso.m(spec_run["lift"])
@@ -354,6 +441,33 @@ def build_cell(spec, season, enclosure="none", part="back", tier=1000):
                             start - axis * over, end + axis * over,
                             right, up, girder_slots, edge_materials,
                             bevel=iso.m(0.06))
+
+        for s in (-1.0, 1.0):
+            if duct_mat:
+                # Slim cable duct along each flank: the 500's tell that this
+                # beam carries services the raw 300 still strings on posts.
+                duct = [(iso.m(s * (GIRDER_HALF - 0.02)), iso.m(CONDUIT_LO)),
+                        (iso.m(s * (GIRDER_HALF + CONDUIT_PROUD)), iso.m(CONDUIT_LO)),
+                        (iso.m(s * (GIRDER_HALF + CONDUIT_PROUD)), iso.m(CONDUIT_HI)),
+                        (iso.m(s * (GIRDER_HALF - 0.02)), iso.m(CONDUIT_HI))]
+                iso.extrude_profile(f"duct{i}_{s:+.0f}", duct,
+                                    start - axis * over, end + axis * over,
+                                    right, up, duct_mat, bevel=0.0, caps=False)
+            if fence_mat:
+                # Low glass wind fence on each deck edge: the first 40cm of
+                # the tube, grown from the guideway.
+                x0 = s * (DECK_HALF - FENCE_INSET)
+                x1 = s * (DECK_HALF - FENCE_INSET - FENCE_THICK)
+                wall = [(iso.m(x0), iso.m(DECK_TOP)),
+                        (iso.m(x0), iso.m(DECK_TOP + FENCE_TOP)),
+                        (iso.m(x1), iso.m(DECK_TOP + FENCE_TOP)),
+                        (iso.m(x1), iso.m(DECK_TOP))]
+                pane = iso.extrude_profile(f"fence{i}_{s:+.0f}", wall,
+                                           start - axis * over,
+                                           end + axis * over,
+                                           right, up, fence_mat,
+                                           bevel=0.0, caps=False)
+                iso.no_shadow(pane)
 
         for j, (capped, base, direction) in enumerate(
                 ((spec_run["cap_start"], start, axis),
@@ -503,8 +617,14 @@ def parse_args():
     p.add_argument("--samples", type=int, default=96)
     p.add_argument("--supersample", type=int, default=4)
     p.add_argument("--enclosure", default="none", choices=["none", "tube"])
-    p.add_argument("--tier", type=int, default=1000, choices=sorted(TUBE_TIERS))
-    return p.parse_args(argv)
+    p.add_argument("--tier", type=int, default=None,
+                   choices=sorted(TRACK_TIERS) + sorted(TUBE_TIERS))
+    args = p.parse_args(argv)
+    if args.tier is None:
+        args.tier = 1000 if args.enclosure == "tube" else 300
+    if (args.enclosure == "tube") != (args.tier in TUBE_TIERS):
+        p.error(f"tier {args.tier} does not match enclosure {args.enclosure}")
+    return args
 
 
 def main() -> None:

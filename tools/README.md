@@ -11,9 +11,11 @@ and the `.dat` files never change.
 | Shading | hand-authored tone ramps | real light, shadow, ambient occlusion |
 | Edges | exact by construction | exact via the analytic clip in the assembler |
 
-Use the 2D one to iterate on layout and proportions, the 3D one for the final
-look. Both are kept: the 2D path is the fallback when Blender is unavailable
-and stays useful for checking a geometry change quickly.
+Use the 2D one to iterate on layout and proportions, the 3D one for everything
+else. Be aware of its scope: **the 2D renderer only produces the open track
+sheet.** It cannot render the enclosed tubes, the buildings or the vehicles, so
+it is a fast iteration path for guideway geometry rather than a complete
+fallback for the pak.
 
 ```sh
 make track-2d          # procedural sheet, seconds
@@ -25,7 +27,8 @@ make tube              # the enclosed glazed guideway (tier 4)
 make art               # everything
 make iso-selftest      # assert the camera still hits pak128's pixel grid
 make preview           # lay tiles into a map, next to pak128's rail for comparison
-make build             # makeobj -> dist/maglev-addon.pak
+make check             # validate sources before makeobj sees them
+make build             # runs check, then makeobj -> dist/maglev-addon.pak
 ```
 
 ## What was reverse-engineered from pak128
@@ -231,6 +234,10 @@ below is what actually worked, and skipping step 1 is what costs time.
 
 ## Scripts
 
+- `check_assets.py` — the regression pass. Resolves every image reference the
+  way makeobj does (relative to each `.dat`), and checks the transparency key,
+  reserved colours, unconverted markers and display names. `make build` gates
+  on it. Every check corresponds to a bug that has actually shipped here.
 - `sheet_inspect.py` — analyse any pak128 sheet: `map`, `crop`, `contact`,
   `profile`, `colors`.
 - `pak128_layout.py` — the cell plan, shared by both renderers. Standard

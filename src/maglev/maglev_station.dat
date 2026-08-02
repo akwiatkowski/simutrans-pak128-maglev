@@ -4,6 +4,8 @@ copyright=Aleksander Kwiatkowski
 type=stop
 waytype=maglev_track
 enables_pax=1
+# Without this the sixteen mail vans in the roster have nowhere to load.
+enables_post=1
 Dims=1,1,2
 NoInfo=1
 Level=9

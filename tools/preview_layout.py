@@ -67,9 +67,15 @@ def screen(a, b):
 
 
 def cutout(sheet: Image.Image, ref) -> Image.Image:
-    """One cell with the transparency key turned into real alpha."""
+    """One cell, as RGBA.
+
+    An RGBA sheet already carries real alpha — glazing depends on it — so it is
+    passed through untouched. An RGB sheet has its transparency key converted.
+    """
     row, col = ref
     tile = sheet.crop((col * CELL, row * CELL, (col + 1) * CELL, (row + 1) * CELL))
+    if sheet.mode == "RGBA":
+        return tile
     out = tile.convert("RGBA")
     out.putdata([(r, g, b, 0 if (r, g, b) == KEY else 255)
                  for r, g, b in tile.getdata()])
@@ -109,8 +115,27 @@ def _mask_name(ribi):
                                     ("E", layout.E), ("W", layout.W)) if ribi & bit)
 
 
+def is_tube(sheet: Image.Image) -> bool:
+    """Enclosed sheets are four 5-row blocks and carry real alpha."""
+    return sheet.height >= layout.TUBE_ROWS * CELL
+
+
+def tube_cells(ref):
+    """(back, front) rows for a cell reference on an enclosed sheet.
+
+    A tube sheet repeats the ordinary 5-row block four times — back and front,
+    summer and winter — so an open-track reference has to be remapped, and both
+    halves drawn with the vehicle between them.
+    """
+    row, col = ref
+    return ((layout.tube_row(row, "back", "summer"), col),
+            (layout.tube_row(row, "front", "summer"), col))
+
+
 def compose(sheet_path: str, zoom: int, consist_dir=None, set_tag=None) -> Image.Image:
-    sheet = Image.open(sheet_path).convert("RGB")
+    raw = Image.open(sheet_path)
+    tube = is_tube(raw)
+    sheet = raw.convert("RGBA") if tube else raw.convert("RGB")
 
     placed = sorted((screen(a, b)[1], screen(a, b)[0], ref)
                     for (a, b), (ref, _) in LAYOUT.items())
@@ -122,7 +147,8 @@ def compose(sheet_path: str, zoom: int, consist_dir=None, set_tag=None) -> Image
 
     canvas = Image.new("RGBA", size, (0, 0, 0, 0))
     for y, x, ref in placed:
-        canvas.alpha_composite(cutout(sheet, ref), (x + origin[0], y + origin[1]))
+        back = tube_cells(ref)[0] if tube else ref
+        canvas.alpha_composite(cutout(sheet, back), (x + origin[0], y + origin[1]))
 
     if consist_dir and set_tag:
         base = pathlib.Path(consist_dir)
@@ -133,6 +159,13 @@ def compose(sheet_path: str, zoom: int, consist_dir=None, set_tag=None) -> Image
         place_consist(canvas, sheets, start, "n",
                       ["tail", "mail", "car", "head"],
                       (sx + origin[0], sy + origin[1]))
+
+    if tube:
+        # Front halves last, over the train — that is the whole point of an
+        # enclosed way, so a preview that skipped them would be misleading.
+        for y, x, ref in placed:
+            canvas.alpha_composite(cutout(sheet, tube_cells(ref)[1]),
+                                   (x + origin[0], y + origin[1]))
 
     out = Image.new("RGB", size, GRASS)
     out.paste(canvas, (0, 0), canvas)
