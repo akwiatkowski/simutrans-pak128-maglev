@@ -1,0 +1,15 @@
+obj=building
+name=Prototype_Maglev_Depot
+copyright=Olek
+type=depot
+waytype=maglev_track
+Dims=1,1,2
+NoInfo=1
+intro_year=2000
+intro_month=1
+icon=> maglev_depot.1.4
+cursor=maglev_depot.1.5
+BackImage[0][0][0][0][0]=maglev_depot.1.0
+FrontImage[0][0][0][0][0]=maglev_depot.1.2
+BackImage[1][0][0][0][0]=maglev_depot.1.1
+FrontImage[1][0][0][0][0]=maglev_depot.1.3
