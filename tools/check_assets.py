@@ -33,7 +33,8 @@ from PIL import Image
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import pak128_layout as layout  # noqa: E402
-from assemble_sheet import LIGHT_BLUE, SPECIAL_COLOURS  # noqa: E402
+from assemble_sheet import (LIGHT_BLUE, LIGHT_GREEN, LIGHT_RED,  # noqa: E402
+                            SPECIAL_COLOURS)
 
 SOURCE = pathlib.Path("src/maglev")
 IMAGES = SOURCE / "images"
@@ -160,9 +161,12 @@ def check_reserved_colours(sheets, report):
     """No accidental hits on Simutrans' 31 reserved colours.
 
     The intended light (#7F9BF1) is allowed on glazed sheets, where it is the
-    tube's night cove; anywhere else it would be an accident.
+    tube's night cove; the signal sheet additionally carries the reserved
+    red and green lamp lights. Anywhere else a hit would be an accident.
     """
     light = (LIGHT_BLUE[0] << 16) | (LIGHT_BLUE[1] << 8) | LIGHT_BLUE[2]
+    lamp_red = (LIGHT_RED[0] << 16) | (LIGHT_RED[1] << 8) | LIGHT_RED[2]
+    lamp_green = (LIGHT_GREEN[0] << 16) | (LIGHT_GREEN[1] << 8) | LIGHT_GREEN[2]
     reserved = np.fromiter(SPECIAL_COLOURS, dtype=np.uint32)
     bad = []
     for path, img in sorted(sheets.items()):
@@ -172,6 +176,8 @@ def check_reserved_colours(sheets, report):
         hits = np.isin(packed, reserved)
         if LIGHT_EXPECTED.search(name):
             hits &= packed != light
+        if "signal" in name:
+            hits &= (packed != lamp_red) & (packed != lamp_green)
         n = int(hits.sum())
         if n:
             found = sorted({int(v) for v in packed[hits]})[:3]

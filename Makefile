@@ -30,7 +30,7 @@ REFERENCE_SHEET := upstream/infrastructure/rail_tracks/rail_400_tracks.png
 
 .DEFAULT_GOAL := build
 .PHONY: build makeobj check install run status art \
-        track-2d track-3d station depot concourse fleet tube \
+        track-2d track-3d station depot concourse fleet tube signal \
         readme-trains iso-selftest preview
 
 status:
@@ -77,6 +77,14 @@ run: install
 readme-trains:
 	$(PYTHON) tools/render_readme_trains.py
 
+# Block + choose signals: reserved-light red/green aspects that stay lit
+# after dark, packed like every other Blender sheet.
+signal:
+	$(BLENDER) --background --python tools/blender/build_maglev_signal.py -- \
+		--out build/signal --samples $(RENDER_SAMPLES)
+	$(PYTHON) tools/assemble_sheet.py build/signal \
+		-o "$(IMAGES_DIR)/maglev_signal.png" --sheet signal
+
 # Procedural 2D sheet. Seconds to run, no Blender needed.
 track-2d:
 	$(PYTHON) tools/render_maglev_track.py -o "$(TRACK_BASE)"
@@ -117,7 +125,7 @@ tube:
 	$(PYTHON) tools/assemble_sheet.py build/tube \
 		-o "$(IMAGES_DIR)/maglev_tube.png" --sheet tube
 
-art: track-3d station depot concourse fleet tube
+art: track-3d station depot concourse fleet tube signal
 
 # Assert the Blender camera still lands on pak128's pixel grid. Run this after
 # touching anything in tools/blender/simutrans_iso.py.

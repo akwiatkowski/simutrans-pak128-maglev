@@ -69,6 +69,13 @@ SPECIAL_COLOURS = frozenset([
 # dark. The tube's light cove is snapped to this exact value.
 LIGHT_BLUE = (0x7F, 0x9B, 0xF1)
 
+# Reserved signal-lamp lights: "different red" and "nearly green" in
+# image_t::rgbtab — like the light blue they do not darken at night, so a
+# signal aspect keeps glowing after dark. Signal lamps render as pure
+# red/green emission and are stamped to these exact values when packed.
+LIGHT_RED = (0xFF, 0x21, 0x1D)
+LIGHT_GREEN = (0x01, 0xDD, 0x01)
+
 # Flat marker colour the accent geometry is rendered in.
 FLAG_RGB = np.array([255, 0, 255])
 
@@ -427,7 +434,7 @@ def main() -> None:
     parser.add_argument("--supersample", type=int, default=4)
     parser.add_argument("--sheet", default="track",
                         choices=["track", "tube", "station", "depot",
-                                 "concourse", "vehicle"],
+                                 "concourse", "vehicle", "signal"],
                         help="which sheet layout to pack")
     args = parser.parse_args()
 
@@ -435,6 +442,8 @@ def main() -> None:
         return assemble_tube(args)
     if args.sheet == "vehicle":
         return assemble_vehicle(args)
+    if args.sheet == "signal":
+        return assemble_signal(args)
     if args.sheet != "track":
         return assemble_building(args)
 
@@ -524,6 +533,107 @@ def assemble_building(args) -> None:
     # outline, cove); protecting it keeps the scrub from nudging it dark.
     protect = args.sheet in ("depot", "concourse")
     scrub_sheet(sheet, protect_light=protect).save(args.out)
+    print(f"wrote {args.out}: {done} rendered cells"
+          + (f", missing {', '.join(missing)}" if missing else ""))
+
+
+SIGNAL_COLS = 10
+SIGNAL_ROWS = 3          # header, block signal, choose signal
+
+
+def signal_icon(choose: bool) -> np.ndarray:
+    """32x32 toolbar glyph: mast with a red-over-green head; twin heads for
+    the choose signal."""
+    img = np.full((layout.CELL, layout.CELL, 3), layout.KEY, dtype=np.uint8)
+    heads = [15] if not choose else [10, 20]
+    for x in heads:
+        img[6:19, x - 3:x + 4] = (24, 26, 30)          # head casing
+        img[8:12, x - 2:x + 3] = LIGHT_RED             # red aspect
+        img[13:17, x - 2:x + 3] = (20, 60, 24)         # dark green lamp
+    img[19:29, 14:17] = (70, 76, 84)                   # mast
+    img[28:30, 11:20] = (110, 110, 112)                # foot
+    return img
+
+
+def assemble_signal(args) -> None:
+    """Pack the signal cells: two rows of 4 directions x 2 aspects.
+
+    The lamps render as pure red/green emission; here they are cleaned to
+    the exact reserved lights at full resolution and stamped after the box
+    average, exactly like the tube's cove — averaging would shift them off
+    Simutrans' colour table and the night glow would silently die.
+    """
+    from PIL import ImageDraw
+
+    cells_dir = pathlib.Path(args.cells)
+    size = (SIGNAL_COLS * layout.CELL, SIGNAL_ROWS * layout.CELL)
+    sheet = Image.new("RGB", size, layout.KEY)
+    factor = args.supersample
+
+    done, missing = 0, []
+    protect_total = np.zeros((SIGNAL_ROWS * layout.CELL,
+                              SIGNAL_COLS * layout.CELL), dtype=bool)
+    for row in (1, 2):
+        for col in range(8):
+            path = cells_dir / f"cell_{row}_{col}.png"
+            if not path.exists():
+                missing.append(f"{row}.{col}")
+                continue
+            img = np.asarray(Image.open(path).convert("RGBA"))
+            r = img[..., 0].astype(np.int16)
+            g = img[..., 1].astype(np.int16)
+            b = img[..., 2].astype(np.int16)
+            red_flag = (r - g > 120) & (r - b > 120)
+            green_flag = (g - r > 120) & (g - b > 120)
+            cleaned = img.copy()
+            cleaned[red_flag, 0:3] = np.array(LIGHT_RED, dtype=np.uint8)
+            cleaned[green_flag, 0:3] = np.array(LIGHT_GREEN, dtype=np.uint8)
+            n = layout.CELL
+            red_cover = red_flag.reshape(n, factor, n, factor).mean(axis=(1, 3))
+            green_cover = green_flag.reshape(n, factor, n, factor).mean(axis=(1, 3))
+
+            rgb, alpha = downsample(Image.fromarray(cleaned, "RGBA"), factor)
+            # A signal is thin: a plain 0.5 threshold eats the mast, so the
+            # keep test is looser than the buildings'.
+            keep = alpha >= 0.35
+            out = np.empty((layout.CELL, layout.CELL, 3), dtype=np.uint8)
+            out[:, :] = layout.KEY
+            out[keep] = np.round(rgb[keep] * 255.0).astype(np.uint8)
+            # A lamp face survives iso foreshortening as only a few partly
+            # covered pixels, so the stamp threshold is deliberately loose —
+            # a stray stamped casing pixel reads as lamp halo, an unstamped
+            # lamp reads as a dead signal.
+            red_lit = keep & (red_cover >= 0.12)
+            green_lit = keep & (green_cover >= 0.12)
+            out[red_lit] = LIGHT_RED
+            out[green_lit] = LIGHT_GREEN
+            out = avoid_special_colours(out, protect=red_lit | green_lit)
+            sheet.paste(Image.fromarray(out),
+                        (col * layout.CELL, row * layout.CELL))
+            protect_total[row * n:(row + 1) * n, col * n:(col + 1) * n] = \
+                red_lit | green_lit
+            done += 1
+
+    for row, choose in ((1, False), (2, True)):
+        sheet.paste(Image.fromarray(signal_icon(choose)),
+                    (8 * layout.CELL, row * layout.CELL))
+    sheet.paste(Image.fromarray(tile_cursor()), (9 * layout.CELL, layout.CELL))
+
+    draw = ImageDraw.Draw(sheet)
+    draw.rectangle([0, 0, SIGNAL_COLS * layout.CELL - 1, layout.CELL - 1],
+                   fill=(255, 255, 255))
+    for i, line in enumerate([
+            "name: MAGLEV_SIGNAL",
+            "copyright: Aleksander Kwiatkowski - Artistic License 2.0",
+            "",
+            "generated by tools/blender/build_maglev_signal.py",
+            "rows 1-2: block, choose; cols 0-3 red n,e,s,w; 4-7 green; icon; cursor"]):
+        draw.text((10, 12 + i * 14), line, fill=(0, 0, 0))
+
+    # Scrub with the lamp pixels protected: they are *meant* to be reserved.
+    arr = np.array(sheet)
+    arr = avoid_special_colours(arr, protect=protect_total)
+    Image.fromarray(arr).save(args.out)
     print(f"wrote {args.out}: {done} rendered cells"
           + (f", missing {', '.join(missing)}" if missing else ""))
 
