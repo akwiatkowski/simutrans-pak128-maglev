@@ -154,3 +154,15 @@ Maglev_Signal_Block
 Maglev Block Signal
 Maglev_Signal_Choose
 Maglev Choose Signal
+Maglev_Bridge_500
+Maglev Viaduct (500 km/h)
+Maglev_Bridge_1000
+Maglev Tube Crossing (1000 km/h)
+Maglev_Bridge_4000
+Maglev Vacuum Span (4000 km/h)
+Maglev_Tunnel_500
+Maglev Tunnel (500 km/h)
+Maglev_Tunnel_1000
+Maglev Tube Tunnel (1000 km/h)
+Maglev_Tunnel_4000
+Maglev Vacuum Gallery (4000 km/h)

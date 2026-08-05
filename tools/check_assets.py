@@ -53,13 +53,14 @@ def parse_ref(value):
         return parts[0], int(parts[1]), int(parts[2])
     return None
 
-# Sheets that legitimately carry per-pixel alpha (glazing).
-RGBA_EXPECTED = re.compile(r"maglev_(tube|concourse)")
+# Sheets that legitimately carry per-pixel alpha (glazing; bridges carry
+# the glazed tube classes and share one RGBA layout).
+RGBA_EXPECTED = re.compile(r"maglev_(tube|concourse|bridge|tunnel)")
 
 # Sheets that legitimately carry the reserved #7F9BF1 light: the tubes' cove,
 # the concourse's cove, the depot's lit door portal and pit strips, and the
 # open track's lit fence-base rails (tier 700).
-LIGHT_EXPECTED = re.compile(r"maglev_(tube|concourse|depot|track)")
+LIGHT_EXPECTED = re.compile(r"maglev_(tube|concourse|depot|track|bridge|tunnel)")
 
 
 class Report:

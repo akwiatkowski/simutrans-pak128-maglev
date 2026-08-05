@@ -30,7 +30,7 @@ REFERENCE_SHEET := upstream/infrastructure/rail_tracks/rail_400_tracks.png
 
 .DEFAULT_GOAL := build
 .PHONY: build makeobj check install run status art \
-        track-2d track-3d station depot concourse fleet tube signal \
+        track-2d track-3d station depot concourse fleet tube signal bridge tunnel \
         readme-trains iso-selftest preview
 
 status:
@@ -76,6 +76,26 @@ run: install
 # trains:begin/end markers in src/maglev/README.md. Pillow only, no Blender.
 readme-trains:
 	$(PYTHON) tools/render_readme_trains.py
+
+# Bridges: 500 viaduct, 1000 tube crossing, 4000 vacuum span.
+bridge:
+	for c in 500 1000 4000; do \
+		$(BLENDER) --background --python tools/blender/build_maglev_bridge.py -- \
+			--out "build/bridge$$c" --class $$c --samples $(RENDER_SAMPLES) && \
+		$(PYTHON) tools/assemble_sheet.py "build/bridge$$c" \
+			-o "$(IMAGES_DIR)/maglev_bridge$$c.png" --sheet bridge \
+		|| exit 1; \
+	done
+
+# Tunnels: portal pairs per crossing class; the bore itself is invisible.
+tunnel:
+	for c in 500 1000 4000; do \
+		$(BLENDER) --background --python tools/blender/build_maglev_tunnel.py -- \
+			--out "build/tunnel$$c" --class $$c --samples $(RENDER_SAMPLES) && \
+		$(PYTHON) tools/assemble_sheet.py "build/tunnel$$c" \
+			-o "$(IMAGES_DIR)/maglev_tunnel$$c.png" --sheet tunnel \
+		|| exit 1; \
+	done
 
 # Block + choose signals: reserved-light red/green aspects that stay lit
 # after dark, packed like every other Blender sheet.
@@ -131,7 +151,7 @@ tube:
 		|| exit 1; \
 	done
 
-art: track-3d station depot concourse fleet tube signal
+art: track-3d station depot concourse fleet tube signal bridge tunnel
 
 # Assert the Blender camera still lands on pak128's pixel grid. Run this after
 # touching anything in tools/blender/simutrans_iso.py.
