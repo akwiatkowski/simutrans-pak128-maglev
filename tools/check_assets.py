@@ -56,8 +56,9 @@ def parse_ref(value):
 RGBA_EXPECTED = re.compile(r"maglev_(tube|concourse)")
 
 # Sheets that legitimately carry the reserved #7F9BF1 light: the tubes' cove,
-# the concourse's cove, and the depot's lit door portal and pit strips.
-LIGHT_EXPECTED = re.compile(r"maglev_(tube|concourse|depot)")
+# the concourse's cove, the depot's lit door portal and pit strips, and the
+# open track's lit fence-base rails (tier 700).
+LIGHT_EXPECTED = re.compile(r"maglev_(tube|concourse|depot|track)")
 
 
 class Report:

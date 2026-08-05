@@ -466,7 +466,10 @@ def main() -> None:
     from PIL import ImageDraw
     render_header(ImageDraw.Draw(sheet))
 
-    scrub_sheet(sheet).save(args.out)
+    # The 700's lit edge rails carry the reserved light and must survive the
+    # scrub exactly — an unprotected scrub nudges them to #7F9BF0 and the
+    # night glow silently dies.
+    scrub_sheet(sheet, protect_light=True).save(args.out)
     print(f"wrote {args.out}: {done} rendered cells"
           + (f", {len(missing)} missing ({', '.join(missing[:8])}"
              + ("..." if len(missing) > 8 else "") + ")" if missing else ""))
