@@ -211,11 +211,25 @@ LIVERIES = {
 }
 
 
-def profile(prop=None):
+# How far the flank pulls in at each profile height when a body is fully
+# cylindrical (round_t = 1): widest at the accent/window belt, tucked at the
+# sill and rounded hard over the shoulder into the roof dome. The values are
+# bounded below by the guideway channel — CHANNEL_HALF/BODY_HALF is 0.90, so
+# nothing above the skirt may tuck past ~0.92.
+CAPSULE = {"sill": 0.94, "belt": 1.0, "win_hi": 0.97,
+           "mid": 0.93, "shoulder": 0.86}
+
+
+def profile(prop=None, round_t: float = 0.0):
     """Closed cross-section as (across, height, material of the edge that starts here).
 
     Runs up the left flank, over the roof, down the right flank, then back
     along the underside — which is where the guideway channel is cut.
+
+    `round_t` blends the slab-and-shoulder carriage towards a capsule:
+    vacuum-era stock (past 1000 km/h) lives inside the tubes, and a
+    cylinder is what belongs inside a cylinder. The skirt and channel stay
+    untouched — every body keeps wrapping the same beam.
     """
     roof_top = prop["roof"] if prop else ROOF_TOP
     shoulder = prop["shoulder"] if prop else SHOULDER
@@ -223,26 +237,33 @@ def profile(prop=None):
     win_hi = prop["win_hi"] if prop else WINDOW_HI
     acc_lo, acc_hi = win_lo - 0.26, win_lo - 0.04
 
+    def w(key):
+        return BODY_HALF * (1.0 + (CAPSULE[key] - 1.0) * round_t)
+
+    mid_h = (win_hi + shoulder) / 2
     points = [
-        (-BODY_HALF, SKIRT_BOTTOM, BODY),
-        (-BODY_HALF, acc_lo, ACCENT),
-        (-BODY_HALF, acc_hi, WINDOW),
-        (-BODY_HALF, win_hi, BODY),
-        (-BODY_HALF, shoulder, BODY),
+        (-w("sill"), SKIRT_BOTTOM, BODY),
+        (-w("belt"), acc_lo, ACCENT),
+        (-w("belt"), acc_hi, WINDOW),
+        (-w("win_hi"), win_hi, BODY),
+        (-w("mid"), mid_h, BODY),
+        (-w("shoulder"), shoulder, BODY),
     ]
-    # Roof: half ellipse from shoulder to shoulder.
+    # Roof: half ellipse from shoulder to shoulder; on a rounded body it
+    # springs from the tucked-in shoulder, closing the capsule.
     rise = roof_top - shoulder
     for i in range(1, ROOF_SEGMENTS):
         t = math.pi * i / ROOF_SEGMENTS
-        across = -BODY_HALF * math.cos(t)
+        across = -w("shoulder") * math.cos(t)
         points.append((across, shoulder + rise * math.sin(t),
                        ACCENT if abs(across) < ROOF_BAND_HALF else BODY))
     points += [
-        (BODY_HALF, shoulder, BODY),
-        (BODY_HALF, win_hi, WINDOW),
-        (BODY_HALF, acc_hi, ACCENT),
-        (BODY_HALF, acc_lo, BODY),
-        (BODY_HALF, SKIRT_BOTTOM, SKIRT),
+        (w("shoulder"), shoulder, BODY),
+        (w("mid"), mid_h, BODY),
+        (w("win_hi"), win_hi, WINDOW),
+        (w("belt"), acc_hi, ACCENT),
+        (w("belt"), acc_lo, BODY),
+        (w("sill"), SKIRT_BOTTOM, SKIRT),
         # Underside, cutting the channel the guideway passes through.
         (CHANNEL_HALF, SKIRT_BOTTOM, SKIRT),
         (CHANNEL_HALF, FLOOR, SKIRT),
@@ -252,14 +273,22 @@ def profile(prop=None):
     return points
 
 
-def chamfer(u: float) -> tuple[float, float]:
-    """Width and height factors for a coupling end."""
+def chamfer(u: float, blend: float = 1.0) -> tuple[float, float]:
+    """Width and height factors for a coupling end.
+
+    `blend` scales the draw-in: 1 is the classic narrowed coupling, 0 keeps
+    the full cross-section to the very end — stock past 500 km/h runs as a
+    sealed continuous tube of a train, and the gap between sprites is
+    separation enough.
+    """
     over = abs(u) - NOSE_START
-    if over <= 0.0:
+    if over <= 0.0 or blend <= 0.0:
         return 1.0, 1.0
     t = min(1.0, over / (HALF_LEN - NOSE_START))
     s = max(NOSE_MIN, math.sqrt(max(0.0, 1.0 - t * t)))
-    return s, 0.55 + 0.45 * s
+    s = 1.0 - (1.0 - s) * blend
+    h = 0.55 + 0.45 * s
+    return s, 1.0 - (1.0 - h) * blend
 
 
 def nose(u: float, nose_len: float = None) -> tuple[float, float]:
@@ -488,7 +517,12 @@ def build_body(heading, role: str = "car", livery: str = "meridian",
                  iso.make_material("skirt", pal["skirt"], roughness=0.75)]
 
     prop = proportions(speed, grade)
-    section = profile(prop)
+    # Stock past 1000 km/h rounds toward a capsule, fully cylindrical by
+    # 2000; stock past 500 km/h keeps its full cross-section to the very
+    # end instead of the narrowed coupling.
+    round_t = min(1.0, max(0.0, (speed - 1000.0) / 1000.0))
+    coupling_blend = 1.0 if speed <= 500.0 else 0.0
+    section = profile(prop, round_t)
     n = len(section)
     shoulder = prop["shoulder"]
     us = stations(role, prop["nose"])
@@ -508,7 +542,7 @@ def build_body(heading, role: str = "car", livery: str = "meridian",
         if nosed and u > 0.0:
             width, height_factor = nose(u, prop["nose"])
         else:
-            width, height_factor = chamfer(u)
+            width, height_factor = chamfer(u, coupling_blend)
         pocket = grooves and in_groove(u, grooves)
         for v, w, _ in section:
             if w <= FLOOR:
@@ -518,7 +552,7 @@ def build_body(heading, role: str = "car", livery: str = "meridian",
             else:
                 height = FLOOR + (w - FLOOR) * height_factor
                 across_scale = width
-                if pocket and abs(v) >= BODY_HALF - 1e-6 \
+                if pocket and abs(v) >= BODY_HALF * 0.95 \
                         and w < shoulder - 1e-6:
                     across_scale *= groove_scale
             verts.append(forward * iso.m(u) + across * iso.m(v * across_scale)

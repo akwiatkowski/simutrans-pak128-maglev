@@ -228,6 +228,15 @@ coupling end — Meridian's disc, Kestrel's twin bars, Volta's lightning step,
 Aetheris' ring — billboard-sized (~1.3m) in the livery accent, because at
 4px per metre a realistic emblem is two pixels of nothing.
 
+Body shape follows the speed ladder. Stock up to 500 km/h keeps the classic
+narrowed coupling ends that let cars read as separate units; everything
+faster runs its full cross-section to the very end — a sealed, continuous
+train, with the sprite gap as the only separation. Past 1000 km/h the
+cross-section itself rounds toward a capsule (fully cylindrical by 2000):
+those sets live inside the glazed tubes, and a cylinder is what belongs
+inside a cylinder. The skirts and the guideway channel never change — every
+body wraps the same beam on every tier.
+
 The tail is the head's geometry with the windscreen blanked to body colour,
 rendered as its own sheet and used with every direction swapped for its
 opposite, so the nose faces back down the train: a train has a lit front and
