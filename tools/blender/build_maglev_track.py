@@ -136,19 +136,19 @@ TRACK_TIERS = {
     300: dict(girder=(0.500, 0.430, 0.300),   # warm site-cast sand
               girder_seams=0.42, seam_period=8.0, seam_width=0.22,
               slot=(0.330, 0.285, 0.205),     # concrete slot floor between packs
-              stators=True, snow_slots=True, posts=True,
+              stators=True, snow_slots=True, posts=True, cabinets=0.0,
               conduit=False, fairing=False, fence=False, heated_deck=False,
               lit_edges=False),
     500: dict(girder=(0.360, 0.395, 0.450),   # the cool precast standard
               girder_seams=0.06, seam_period=16.0, seam_width=0.05,
               slot=None,
-              stators=False, snow_slots=False, posts=False,
+              stators=False, snow_slots=False, posts=False, cabinets=10.7,
               conduit=True, fairing=False, fence=False, heated_deck=False,
               lit_edges=False),
     700: dict(girder=(0.620, 0.665, 0.720),   # pale engineered shell
               girder_seams=0.10, seam_period=4.0, seam_width=0.05,
               slot=None,
-              stators=False, snow_slots=False, posts=False,
+              stators=False, snow_slots=False, posts=False, cabinets=21.4,
               conduit=False, fairing=True, fence=True, heated_deck=True,
               lit_edges=True),
 }
@@ -157,9 +157,23 @@ TRACK_TIERS = {
 # character comes from the tube around it, not the concrete inside.
 TUBE_BEAM = dict(girder=None, girder_seams=0.10, seam_period=4.0,
                  seam_width=0.07, slot=None,
-                 stators=False, snow_slots=False, posts=False,
+                 stators=False, snow_slots=False, posts=False, cabinets=0.0,
                  conduit=False, fairing=False, fence=False, heated_deck=False,
                  lit_edges=False)
+
+# The guideway does not pave its tile: an elevated beam only needs a
+# foundation band, and the ground either side stays living terrain — the
+# same read as pak128's own ballast strips. The band is a precast slab a
+# little wider than the deck, a drainage gutter running along each edge,
+# and the trackside hardware stands on it: the 300's mast footings, the
+# 500/700's service cabinets (their cables are buried, so the surface
+# grows boxes on a world-anchored rhythm instead of masts).
+BAND_HALF = 2.30          # slab half width; deck half is 1.60
+BAND_TOP = 0.07           # slab thickness above grade
+GUTTER = 0.25             # drainage gutter width along each slab edge
+CABINET_W = 0.52          # service cabinet along the run
+CABINET_D = (1.72, 2.16)  # cabinet footprint across, near the slab edge
+CABINET_H = 0.74
 
 # Exposed stator packs in the 300's guidance slots: real raised blocks, not a
 # seam texture — the world-XY seam grid runs a line *along* a slot as happily
@@ -423,6 +437,8 @@ def build_posts(i, start, axis, length, right, up, runs, shape, current_run):
                                  roughness=0.50, metallic=0.60)
     wire_mat = iso.make_material("wire", (0.030, 0.032, 0.036),
                                  roughness=0.60, metallic=0.30)
+    pad_mat = iso.make_material("mast_pad", (0.40, 0.40, 0.40),
+                                roughness=0.95, noise=0.25)
 
     side_out = right if (right.x - right.y) < 0.0 else -right
 
@@ -464,10 +480,19 @@ def build_posts(i, start, axis, length, right, up, runs, shape, current_run):
         base = start + axis * t + side_out * iso.m(POST_OFFSET)
         masts.append((t, clear_of_runs(base)))
 
+    pq = iso.m(0.34)
+    pad_profile = [(-pq, -pq), (pq, -pq), (pq, pq), (-pq, pq)]
+
     for k, (t, keep) in enumerate(masts):
         if not keep or not (0.0 <= t <= length):
             continue
         base = start + axis * t + side_out * iso.m(POST_OFFSET)
+        # With no tile-wide apron the mast stands on terrain, so it gets
+        # its own concrete footing pad.
+        iso.extrude_profile(f"pad{i}_{k}", pad_profile,
+                            base - up * iso.m(0.02),
+                            base + up * iso.m(0.10),
+                            axis, side_out, pad_mat, bevel=0.0, caps=True)
         iso.extrude_profile(f"mast{i}_{k}", mast_profile,
                             base - up * iso.m(0.05),
                             base + up * iso.m(POST_TOP),
@@ -546,15 +571,32 @@ def build_cell(spec, season, enclosure="none", part="back", tier=1000):
         slot_color = tuple(0.45 * c + 0.55 * w
                            for c, w in zip(slot_color, (0.86, 0.88, 0.89)))
 
+    # A junction or diagonal is not concrete at all: a real maglev switch is
+    # a bare steel box girder that actuators flex sideways, and a maglev
+    # "curve" is that same bending beam — there are no sharp turnouts to
+    # cast. So every tile where runs meet or bend renders its girder as
+    # steel with a tight actuator-segment rhythm, one tier-neutral machine
+    # surface across the whole ladder, and the tier's dressing (stators,
+    # tray, fences, masts) steps back for the length of the mechanism. In
+    # winter the flexing surface stays dark — a switch cannot be allowed to
+    # ice over — which makes junctions read at a glance on a white map.
+    flexing = ("corner" in spec) or len(runs_for(spec)) > 1
+
     # The apron is panelled concrete like every other pak128 way; the girder
     # carries its own joint rhythm — heavy segment joints on the site-cast
     # 300, nearly seamless on the engineered 700.
     apron_mat = iso.make_material("apron", pal["apron"], roughness=0.95,
                                   noise=0.30, seams=0.075, seam_period_m=4.0)
-    girder_mat = iso.make_material("girder", girder_color, roughness=0.72,
-                                   noise=0.12, seams=cfg["girder_seams"],
-                                   seam_period_m=cfg["seam_period"],
-                                   seam_width_m=cfg["seam_width"])
+    if flexing:
+        girder_mat = iso.make_material("flex_girder", (0.190, 0.205, 0.235),
+                                       roughness=0.35, metallic=0.75,
+                                       seams=0.30, seam_period_m=2.0,
+                                       seam_width_m=0.09)
+    else:
+        girder_mat = iso.make_material("girder", girder_color, roughness=0.72,
+                                       noise=0.12, seams=cfg["girder_seams"],
+                                       seam_period_m=cfg["seam_period"],
+                                       seam_width_m=cfg["seam_width"])
     slot_mat = iso.make_material("slot", slot_color, roughness=0.45,
                                  metallic=0.55)
     lev_mat = iso.make_material("levitation", deck_pal["levitation"],
@@ -568,25 +610,19 @@ def build_cell(spec, season, enclosure="none", part="back", tier=1000):
         # under its footprint rather than an apron across the whole tile, so
         # the ground either side stays visible.
         build_plinth(spec, shape, up, apron_mat)
-    else:
-        corner = layout.apron_corner(spec)
-        if corner:
-            tri = {"ne": (iso.CORNER_TOP, iso.CORNER_RIGHT, iso.CORNER_BOTTOM),
-                   "sw": (iso.CORNER_TOP, iso.CORNER_BOTTOM, iso.CORNER_LEFT),
-                   "nw": (iso.CORNER_TOP, iso.CORNER_RIGHT, iso.CORNER_LEFT),
-                   "se": (iso.CORNER_RIGHT, iso.CORNER_BOTTOM, iso.CORNER_LEFT)}[corner]
-            iso.polygon("apron", shape, tri, apron_mat)
-        else:
-            iso.polygon("apron", shape,
-                        [iso.CORNER_TOP, iso.CORNER_RIGHT,
-                         iso.CORNER_BOTTOM, iso.CORNER_LEFT], apron_mat)
-    profile = profile_world(cfg["fairing"])
+    # The open guideway paves nothing either: each run gets a foundation
+    # band swept beneath it (built in the run loop below), and the rest of
+    # the tile stays transparent so the terrain shows through.
+    # The flexing beam is a bare mechanism: no skirt, no tray, no fences,
+    # no stator dressing, no masts — the dressed tiers hand over to steel
+    # for the length of the switch and pick up again beyond it.
+    profile = profile_world(cfg["fairing"] and not flexing)
 
     edge_materials = {e: 1 for e in SLOT_EDGES}
     edge_materials.update({e: 2 for e in DECK_EDGES})
 
     duct_mat = clamp_mat = fence_mat = stator_mat = None
-    if cfg["conduit"]:
+    if cfg["conduit"] and not flexing:
         # Safety-orange cable tray: the 500's services moved off the 300's
         # masts and onto the beam, and the tray is painted to be found. The
         # flank lives in the girder's own shade, which turns pure albedo
@@ -599,10 +635,10 @@ def build_cell(spec, season, enclosure="none", part="back", tier=1000):
         bsdf.inputs["Emission Strength"].default_value = 0.28
         clamp_mat = iso.make_material("clamp", (0.100, 0.105, 0.115),
                                       roughness=0.50, metallic=0.60)
-    if cfg["fence"]:
+    if cfg["fence"] and not flexing:
         fence_mat = iso.make_glass("fence", deck_pal["glass_tint"],
                                    face_alpha=0.12, edge_alpha=0.80)
-    if cfg["stators"]:
+    if cfg["stators"] and not flexing:
         stator_mat = iso.make_material("stator", (0.055, 0.058, 0.065),
                                        roughness=0.40, metallic=0.70)
 
@@ -620,10 +656,48 @@ def build_cell(spec, season, enclosure="none", part="back", tier=1000):
         right = axis.cross(up).normalized()
         over = iso.m(spec_run["overrun"])
 
+        if enclosure != "tube":
+            # Foundation band under the run: slab top with a drainage
+            # gutter along each edge, everything else left as terrain.
+            gutter_mat = iso.make_material("gutter",
+                                           tuple(c * 0.55 for c in pal["apron"]),
+                                           roughness=0.90, noise=0.15)
+            band = [(iso.m(-BAND_HALF), 0.0),
+                    (iso.m(-BAND_HALF), iso.m(BAND_TOP)),
+                    (iso.m(-BAND_HALF + GUTTER), iso.m(BAND_TOP)),
+                    (iso.m(BAND_HALF - GUTTER), iso.m(BAND_TOP)),
+                    (iso.m(BAND_HALF), iso.m(BAND_TOP)),
+                    (iso.m(BAND_HALF), 0.0)]
+            iso.extrude_profile(f"band{i}", band,
+                                start - axis * over, end + axis * over,
+                                right, up, [apron_mat, gutter_mat],
+                                {1: 1, 3: 1}, bevel=0.0)
+
         iso.extrude_profile(f"girder{i}", profile,
                             start - axis * over, end + axis * over,
                             right, up, girder_slots, edge_materials,
                             bevel=iso.m(0.06))
+
+        if cfg["cabinets"] and not flexing and enclosure != "tube":
+            # Buried services surface as cabinets on a world-anchored
+            # rhythm, camera side, standing on the slab edge.
+            cab_mat = iso.make_material("cabinet", (0.060, 0.075, 0.070),
+                                        roughness=0.55, metallic=0.35)
+            cab_side = right if (right.x - right.y) > 0.0 else -right
+            c_lo, c_hi = CABINET_D
+            for k, t in enumerate(anchored(start, axis, length,
+                                           cfg["cabinets"])):
+                if not (0.0 <= t <= length):
+                    continue
+                sgn = 1.0 if cab_side is right else -1.0
+                cab = [(iso.m(sgn * c_lo), iso.m(BAND_TOP)),
+                       (iso.m(sgn * c_hi), iso.m(BAND_TOP)),
+                       (iso.m(sgn * c_hi), iso.m(BAND_TOP + CABINET_H)),
+                       (iso.m(sgn * c_lo), iso.m(BAND_TOP + CABINET_H))]
+                iso.extrude_profile(f"cab{i}_{k}", cab,
+                                    start + axis * (t - iso.m(CABINET_W) / 2),
+                                    start + axis * (t + iso.m(CABINET_W) / 2),
+                                    right, up, cab_mat, bevel=0.0, caps=True)
 
         if stator_mat:
             build_stators(i, start, axis, length, over, right, up, stator_mat)
@@ -688,7 +762,7 @@ def build_cell(spec, season, enclosure="none", part="back", tier=1000):
                                                 bevel=0.0, caps=False)
                     iso.no_shadow(strip)
 
-        if cfg["posts"]:
+        if cfg["posts"] and not flexing:
             build_posts(i, start, axis, length, right, up, runs, shape,
                         spec_run)
 

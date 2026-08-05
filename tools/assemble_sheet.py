@@ -195,7 +195,11 @@ def build_cell(path: pathlib.Path, spec, factor: int) -> np.ndarray:
 
     ground = ground_mask(spec)
     airspace = dilate_up(ground, MAX_OBJECT_PX)
-    keep = ground | (airspace & (alpha >= 0.5))
+    # The guideway no longer paves its tile: inside the diamond keep
+    # whatever was rendered (band, girder, hardware) and let the terrain
+    # show through the rest; above the diamond require solid coverage so
+    # the swept overrun cannot bleed into a neighbour.
+    keep = (ground & (alpha > 0.02)) | (airspace & (alpha >= 0.5))
 
     rgb = fill_holes(rgb, alpha > 0.02, keep)
     out = np.empty((layout.CELL, layout.CELL, 3), dtype=np.uint8)
