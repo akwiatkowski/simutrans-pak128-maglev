@@ -344,6 +344,52 @@ def _box(name, forward, across, up, u_lo, u_hi, v_half, z_lo, z_hi, material):
     iso.new_mesh(name, verts, _BOX_FACES, material)
 
 
+# --------------------------------------------------------------------------
+# Manufacturer logo: one bold glyph on each flank near the coupling end.
+#
+# The flank renders at 4px per metre, so a "realistic" half-metre emblem is
+# two pixels of nothing — the glyph is billboard-sized (~1.3m), the same
+# deliberate exaggeration pak128 applies everywhere. Shapes are built from
+# axis-aligned plates only, chosen to stay distinct at 5px: Meridian a solid
+# disc, Kestrel twin bars, Volta a lightning step, Aetheris a hollow ring.
+# --------------------------------------------------------------------------
+
+LOGO_U = -4.35           # centre along the body: clear of doors (max |u| 3.6)
+                         # and inside the coupling chamfer at 5.1
+LOGO_H = 0.93            # centre height: the clean body panel between the
+                         # skirt top and the accent stripe (acc_lo ~ 1.6)
+LOGO_S = 0.65            # glyph half size
+LOGO_PROUD = 0.04        # plate stands this far off the flank
+
+# (du, dh, half_u, half_h) rects in glyph units, scaled by LOGO_S.
+LOGO_GLYPHS = {
+    "meridian": [(0.0, 0.0, 0.46, 0.62), (0.0, 0.0, 0.72, 0.36)],  # disc
+    "kestrel":  [(-0.42, 0.0, 0.24, 0.80), (0.42, 0.0, 0.24, 0.80)],  # bars
+    "volta":    [(-0.52, 0.52, 0.30, 0.30), (0.0, 0.0, 0.30, 0.30),
+                 (0.52, -0.52, 0.30, 0.30)],                       # lightning
+    "aetheris": [(0.0, 0.72, 0.72, 0.22), (0.0, -0.72, 0.72, 0.22),
+                 (-0.72, 0.0, 0.22, 0.50), (0.72, 0.0, 0.22, 0.50)],  # ring
+}
+
+
+def build_logo(forward, across, up, livery: str, accent_mat) -> None:
+    for side in (-1.0, 1.0):
+        for k, (du, dh, hu, hh) in enumerate(LOGO_GLYPHS[livery]):
+            u_c = LOGO_U + du * LOGO_S
+            h_c = LOGO_H + dh * LOGO_S
+            corners = [(u_c - hu * LOGO_S, u_c + hu * LOGO_S)]
+            verts = []
+            for v in (BODY_HALF, BODY_HALF + LOGO_PROUD):
+                for u in corners[0]:
+                    for h in (h_c - hh * LOGO_S, h_c + hh * LOGO_S):
+                        verts.append(forward * iso.m(u)
+                                     + across * iso.m(side * v)
+                                     + up * iso.m(h))
+            faces = [[0, 1, 3, 2], [4, 6, 7, 5], [0, 2, 6, 4],
+                     [1, 5, 7, 3], [0, 4, 5, 1], [2, 3, 7, 6]]
+            iso.new_mesh(f"logo_{side:+.0f}_{k}", verts, faces, accent_mat)
+
+
 def build_hatches(forward, across, up, prop, material):
     """Transverse roof hatches: the mail van's identity from above."""
     for k, u0 in enumerate(HATCH_POSITIONS):
@@ -513,6 +559,9 @@ def build_body(heading, role: str = "car", livery: str = "meridian",
 
     trim = iso.make_material("trim", pal["skirt"], roughness=0.55,
                              metallic=0.35)
+    logo_mat = iso.make_material("logo", pal["accent"], roughness=0.30,
+                                 metallic=0.25)
+    build_logo(forward, across, up, livery, logo_mat)
     if mail:
         build_hatches(forward, across, up, prop, trim)
     if nosed:
