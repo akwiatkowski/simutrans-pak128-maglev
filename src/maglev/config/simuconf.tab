@@ -1,0 +1,50 @@
+# Maglev addon way-builder tuning.
+#
+# Loaded automatically: the engine parses
+# <userdir>/addons/pak128/config/simuconf.tab *after* the pakset's own
+# simuconf.tab (simmain.cc, "parse ~/simutrans/pakxyz/config.tab"), and the
+# player's personal <userdir>/simuconf.tab is re-read after this file, so it
+# still gets the last word. Installing the addon is enough — no manual
+# config editing.
+#
+# Why: a maglev trunk wants to be straight. The most efficient stop spacing
+# for this roster is hundreds to thousands of tiles (see the Trainsets
+# section of the README), and the default route-search weights happily trade
+# a dead-straight line for a cheaper wiggle. pak128 even softens the
+# engine's own curve penalties (way_curve 2 vs default 5, way_90_curve 15 vs
+# 30) and leaves the crossing penalty at its mild default.
+#
+# All weights are per-tile costs in the way tool's route search
+# (builder/wegbauer.cc is_allowed_step); the search minimises total cost, so
+# relative size is what matters. A plain new tile costs way_no_way = 3.
+
+# Every drag first tries the dead-straight route (the same thing holding
+# Ctrl does): horizontal, vertical and clean 45° diagonals; shallow angles
+# become one diagonal leg plus one straight leg. The trade: when the direct
+# path is blocked the drag fails instead of routing around it — drop a
+# waypoint and build in two legs. Single-player only; the engine ignores it
+# in network games. Set to 0 to restore free routing (the weights below
+# still keep it far straighter than stock).
+straight_way_without_control = 1
+
+# Free-router weights, for when straight mode is off or a scripted/AI build
+# runs. A zigzag is two curves plus a double-curve penalty per wiggle, so
+# taxing S-bends hard is what actually removes the "many curves between
+# start and stop" — single 45° corners stay affordable on purpose, a long
+# diagonal is legitimate maglev routing.
+way_curve = 8
+way_double_curve = 40
+way_90_curve = 120
+
+# Adding a second track beside an existing line should route around other
+# ways, not through them. (Parallel building itself is engine-automatic:
+# start and end on empty tiles within one tile of an existing maglev way,
+# and the router enters prefer_parallel mode — hugging the neighbour costs
+# way_straight = 1, drifting off costs way_no_way = 3, merging into the
+# existing line costs way_leave_road = 25.)
+way_avoid_crossings = 64
+
+# The route search gives up when a route's cost exceeds this budget. Stock
+# 2000 is too small for the single 1000-tile drags this roster's stop
+# spacing calls for once curve penalties are this size.
+way_count_maximum = 8000

@@ -112,17 +112,29 @@ RUN_EXP = 0.0
 PAX_EXP = -0.10
 
 # Per-variant character. `power` and `weight` together set acceleration:
-# a standard ends up with ~1.6x the flagship's power-to-weight.
+# a standard ends up with ~1.7x the flagship's power-to-weight.
+#
+# Acceleration is tuned for 256-tile commuter spacing and bounded by human
+# comfort: a standard reaches its top speed in ~5 tiles, which at pak128's
+# loose "tile is about a kilometre" reading puts a 440 km/h set at
+# ~1.5 m/s² — the metro-standard ceiling for standing passengers, so
+# standards sit *at* the limit and nothing accelerates harder. Braking is
+# not ours to tune: the engine crawls the last four tiles into every stop
+# at 200/100/50/25 km/h caps (simconvoi.cc brake_speed_countdown), which is
+# the irreducible per-stop tax — even infinite acceleration leaves a
+# 440 km/h set at ~90% of its theoretical yield on 256-tile hops. The short
+# commuter dwells (load 450-650ms vs the flagship's 900) claw back most of
+# what remains.
 VARIANTS = {
-    "flagship": dict(pax=0.72, power=1.00, weight=1.10, cost=2.20,
-                     run=0.62, fixed=0.62, load=1100, life=90),
-    "standard": dict(pax=1.15, power=1.45, weight=0.92, cost=1.00,
-                     run=1.35, fixed=1.35, load=700, life=45),
+    "flagship": dict(pax=0.72, power=1.10, weight=1.10, cost=2.20,
+                     run=0.62, fixed=0.62, load=900, life=90),
+    "standard": dict(pax=1.15, power=1.70, weight=0.92, cost=1.00,
+                     run=1.35, fixed=1.35, load=450, life=45),
     # Value stock crams high-density seating (pax 1.20) into a cheap shell:
     # it runs a class behind the fleet average, so it always sells discounted
     # speed-bonus fares — the extra seats are what keep it above water.
-    "value":    dict(pax=1.20, power=0.85, weight=1.00, cost=0.55,
-                     run=1.55, fixed=1.35, load=1000, life=40),
+    "value":    dict(pax=1.20, power=1.10, weight=1.00, cost=0.55,
+                     run=1.55, fixed=1.35, load=650, life=40),
 }
 
 COMPANY_LIVERY = {"Meridian": "meridian", "Kestrel": "kestrel",

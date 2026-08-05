@@ -55,11 +55,16 @@ build: makeobj check
 
 install: build
 	mkdir -p "$(EVALUATION_USER_DIR)/addons/pak128/text"
+	mkdir -p "$(EVALUATION_USER_DIR)/addons/pak128/config"
 	cp "$(OUTPUT)" "$(EVALUATION_USER_DIR)/addons/pak128/"
 	# Simutrans loads addon display names from addons/<pak>/text/*.tab
 	# (dataobj/translator.cc). Without these the depot list shows raw
 	# object ids like Maglev_Meridian500_Head.
 	cp "$(SOURCE_DIR)"/text/*.tab "$(EVALUATION_USER_DIR)/addons/pak128/text/"
+	# Way-builder tuning for long straight guideways: the engine parses
+	# addons/<pak>/config/simuconf.tab after the pakset's own (simmain.cc),
+	# and the player's personal simuconf.tab still overrides it afterwards.
+	cp "$(SOURCE_DIR)/config/simuconf.tab" "$(EVALUATION_USER_DIR)/addons/pak128/config/"
 
 run: install
 	@test -x "$(GAME_BINARY)" || { echo "Missing game binary: $(GAME_BINARY)"; exit 1; }

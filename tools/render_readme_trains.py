@@ -294,9 +294,16 @@ def economics(entry):
     cycle = trip_ticks(path, v_line, d_star, f["load_ms"])
     net_trip = margin * d_star - fixed_month * cycle / TICKS_PER_MONTH
 
+    # Commuter yardstick: how much of the theoretical ceiling survives at a
+    # 256-tile stop spacing. Bounded above by the engine's fixed four-tile
+    # station crawl, which no amount of power can buy back.
+    net_256 = yearly(256)
+    pct_256 = 100.0 * net_256 / asymptote if asymptote > 0 else 0.0
+
     return dict(v_line=v_line, ref=ref_speed(year),
                 rev_tile=rev_tile, run_tile=run_tile, margin=margin,
                 windup_tiles=windup_tiles, d_star=d_star,
+                net_256=net_256, pct_256=pct_256,
                 net_trip=net_trip, net_year=net_year,
                 trips_year=TICKS_PER_YEAR / cycle,
                 price_cr=f["price_cents"] / 100.0,
@@ -454,6 +461,21 @@ def paragraph(entry, econ) -> str:
         f"per trip** and, shuttling constantly "
         f"({econ['trips_year']:.0f} trips a game year), "
         f"≈**{econ['net_year']:,.0f} cr per year** {payback}.")
+
+    if entry["variant"] in ("standard", "value"):
+        if econ["pct_256"] >= 80:
+            lines.append(
+                f"It is built for commuter work: on 256-tile hops it still "
+                f"banks ≈{econ['net_256']:,.0f} cr per year — "
+                f"{econ['pct_256']:.0f}% of its ceiling, most of the rest "
+                f"lost to the mandatory four-tile crawl into every platform.")
+        else:
+            lines.append(
+                f"Commuter spacing is beneath it by this era: 256-tile hops "
+                f"still pay ≈{econ['net_256']:,.0f} cr per year, but that is "
+                f"only {econ['pct_256']:.0f}% of its ceiling — at these "
+                f"speeds the four-tile platform crawl eats the hop, so keep "
+                f"it on trunks.")
 
     return " ".join(lines)
 
