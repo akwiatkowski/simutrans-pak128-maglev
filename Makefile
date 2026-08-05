@@ -32,7 +32,7 @@ REFERENCE_SHEET := upstream/infrastructure/rail_tracks/rail_400_tracks.png
 .PHONY: build makeobj check install run status art \
         track-2d track-3d station depot concourse shelter terminal \
         fleet tube signal bridge tunnel \
-        readme-trains iso-selftest preview
+        readme-trains readme-stations iso-selftest preview
 
 status:
 	@printf 'Source: %s\n' '$(SOURCE_DIR)'
@@ -77,6 +77,11 @@ run: install
 # trains:begin/end markers in src/maglev/README.md. Pillow only, no Blender.
 readme-trains:
 	$(PYTHON) tools/render_readme_trains.py
+
+# Station gallery: each stop staged with its era's guideway and trainset,
+# injected between the stations:begin/end markers.
+readme-stations:
+	$(PYTHON) tools/render_readme_stations.py
 
 # Bridges: 500 viaduct, 1000 tube crossing, 4000 vacuum span.
 bridge:
