@@ -190,9 +190,17 @@ POST_HALF = 0.09
 POST_TOP = 2.05           # mast height above the apron
 ARM_HALF = 0.34           # crossarm half length
 ARM_DROP = 0.12           # crossarm sits this far below the mast top
-WIRE_HALF = 0.035
-WIRE_DROP = 0.28          # catenary sag at mid-span
-WIRE_SEGS = 4             # straight segments approximating one span
+# The cables are taut, not sagging, and that is a rendering decision: at
+# 8px per metre a 0.3m sag is one pixel of dither, and each tile chords its
+# *clipped* piece of the parabola differently from its neighbour, so every
+# tile joint showed a one-pixel step — a dashed, broken wire down the whole
+# line. A globally straight cable projects to the same screen line in every
+# tile and the joints vanish.
+WIRE_HALF = 0.06          # thick enough that the elevated cable keeps ≥50%
+                          # pixel coverage where it crosses the packer's
+                          # airspace band near tile tips — thinner wire
+                          # dropped below the anti-bleed threshold there and
+                          # rendered dotted
 
 CONDUIT_LO, CONDUIT_HI = 0.24, 0.56   # cable tray on the girder flank (500)
 CONDUIT_PROUD = 0.13
@@ -488,20 +496,27 @@ def build_posts(i, start, axis, length, right, up, runs, shape, current_run):
             continue
         base = start + axis * t + side_out * iso.m(POST_OFFSET)
         # With no tile-wide apron the mast stands on terrain, so it gets
-        # its own concrete footing pad.
-        iso.extrude_profile(f"pad{i}_{k}", pad_profile,
-                            base - up * iso.m(0.02),
-                            base + up * iso.m(0.10),
-                            axis, side_out, pad_mat, bevel=0.0, caps=True)
-        iso.extrude_profile(f"mast{i}_{k}", mast_profile,
-                            base - up * iso.m(0.05),
-                            base + up * iso.m(POST_TOP),
-                            axis, side_out, mast_mat, bevel=0.0, caps=True)
+        # its own concrete footing pad. None of the mast hardware casts a
+        # shadow: a 2m mast throws a 2m shadow across the grass, and where
+        # it crosses a tile edge the neighbour knows nothing about it — the
+        # cut shadow stub read as a dirt smear at every joint.
+        pad = iso.extrude_profile(f"pad{i}_{k}", pad_profile,
+                                  base - up * iso.m(0.02),
+                                  base + up * iso.m(0.10),
+                                  axis, side_out, pad_mat,
+                                  bevel=0.0, caps=True)
+        mast = iso.extrude_profile(f"mast{i}_{k}", mast_profile,
+                                   base - up * iso.m(0.05),
+                                   base + up * iso.m(POST_TOP),
+                                   axis, side_out, mast_mat,
+                                   bevel=0.0, caps=True)
         arm_c = base + up * iso.m(POST_TOP - ARM_DROP)
-        iso.extrude_profile(f"arm{i}_{k}", arm_profile,
-                            arm_c - side_out * iso.m(ARM_HALF),
-                            arm_c + side_out * iso.m(ARM_HALF),
-                            axis, up, mast_mat, bevel=0.0, caps=True)
+        arm = iso.extrude_profile(f"arm{i}_{k}", arm_profile,
+                                  arm_c - side_out * iso.m(ARM_HALF),
+                                  arm_c + side_out * iso.m(ARM_HALF),
+                                  axis, up, mast_mat, bevel=0.0, caps=True)
+        for obj in (pad, mast, arm):
+            iso.no_shadow(obj)
 
     def hang_point(t, e):
         return (start + axis * t
@@ -512,27 +527,23 @@ def build_posts(i, start, axis, length, right, up, runs, shape, current_run):
         (t_a, keep_a), (t_b, keep_b) = masts[k], masts[k + 1]
         if not (keep_a and keep_b):
             continue
-        # Clip the span to this run in parameter space: the sag formula keeps
-        # using the *global* span, so the clipped piece rendered here and the
-        # piece the neighbour renders are parts of one continuous curve.
+        # Clip the span to this run in parameter space; the cable is a
+        # straight line between hang points, so the clipped piece here and
+        # the piece the neighbour renders join without a step.
         u_lo = max(0.0, (0.0 - t_a) / (t_b - t_a))
         u_hi = min(1.0, (length - t_a) / (t_b - t_a))
         if u_hi <= u_lo:
             continue
-        for e in (-1.0, 1.0):
-            p_a, p_b = hang_point(t_a, e), hang_point(t_b, e)
-            for j in range(WIRE_SEGS):
-                u0 = u_lo + (u_hi - u_lo) * j / WIRE_SEGS
-                u1 = u_lo + (u_hi - u_lo) * (j + 1) / WIRE_SEGS
-                # Parabolic approximation of the catenary: 4u(1-u) peaks at 1
-                # mid-span, so the wire drops WIRE_DROP metres at its lowest.
-                q0 = p_a.lerp(p_b, u0) - up * iso.m(WIRE_DROP * 4 * u0 * (1 - u0))
-                q1 = p_a.lerp(p_b, u1) - up * iso.m(WIRE_DROP * 4 * u1 * (1 - u1))
-                seg = iso.extrude_profile(f"wire{i}_{k}_{e:+.0f}_{j}",
-                                          wire_profile, q0, q1,
-                                          side_out, up, wire_mat,
-                                          bevel=0.0, caps=False)
-                iso.no_shadow(seg)
+        # One cable, hung from the arm centre: at a pixel per wire the two
+        # separate feeders merged into one bold line with a dotted ghost
+        # above it — the far wire flickering under coverage threshold.
+        p_a, p_b = hang_point(t_a, 0.0), hang_point(t_b, 0.0)
+        seg = iso.extrude_profile(f"wire{i}_{k}", wire_profile,
+                                  p_a.lerp(p_b, u_lo),
+                                  p_a.lerp(p_b, u_hi),
+                                  side_out, up, wire_mat,
+                                  bevel=0.0, caps=False)
+        iso.no_shadow(seg)
 
 
 def build_cell(spec, season, enclosure="none", part="back", tier=1000):
