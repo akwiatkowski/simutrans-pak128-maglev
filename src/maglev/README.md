@@ -221,6 +221,13 @@ the reserved light at pack time: a night concourse glows like the tubes it
 feeds. Its sheet is RGBA, like the tubes', because glazing needs real
 per-pixel alpha.
 
+Stops now ladder through the eras like everything else: the open **stop**
+(2000, Level 9), the **canopy shelter** (2032, Level 12 — thin glass flats
+on slim posts, lit rails along the platform edges, the 700 guideway's
+family), the glazed **concourse** (2064, Level 15), and the **vacuum
+terminal** (2100, Level 22 — twin gull-wings in the 2000 tube's deeper
+glass rising to lit lips that face each other over the arriving pods).
+
 Vehicle sizing follows pak128's convention rather than real metres — measured
 against its own Shinkansen, a pak128 car is about two thirds of its real height
 and half its real length. Modelling to true Transrapid dimensions produced a

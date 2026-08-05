@@ -526,8 +526,152 @@ def build_concourse(layout_index: int, part: str, pal) -> None:
     iso.no_shadow(cove)
 
 
+# --------------------------------------------------------------------------
+# Shelter (2032): the 700 era's stop. Platforms under thin flat glass
+# canopies on slim steel posts, each canopy edge carried on a lit base rail
+# — the same reserved-light thread as the 700 guideway's fence bases, so a
+# mid-era stop glows gently where its trains do.
+# --------------------------------------------------------------------------
+
+SHELTER_POST_US = (-6.0, 0.0, 6.0)   # posts along each platform
+SHELTER_POST_V = 4.6                 # post line, metres from the centreline
+SHELTER_POST_HALF = 0.14
+SHELTER_ROOF_H = 4.05                # underside of the glass
+SHELTER_ROOF_IN = 1.9                # roof spans this v .. SHELTER_ROOF_OUT
+SHELTER_ROOF_OUT = 6.6
+SHELTER_ROOF_THICK = 0.14
+SHELTER_RAIL_H = 0.16                # lit base rail on the roof's inner edge
+
+
+def build_shelter(layout_index: int, part: str, pal) -> None:
+    u_axis, v_axis = frame(layout_index)
+    up = Vector((0, 0, 1))
+    build_platforms(u_axis, v_axis, part, pal)
+
+    glass = iso.make_glass("roof", pal["canopy_tint"],
+                           face_alpha=0.16, edge_alpha=0.70)
+    steel = iso.make_material("post", pal["frame"],
+                              roughness=0.40, metallic=0.60)
+    cove_mat = iso.make_flag_emission("rail")
+
+    sides = [1.0] if part == "front" else [-1.0, 1.0]
+    for side in sides:
+        start = local(u_axis, v_axis, -PLATFORM_LENGTH, 0.0)
+        end = local(u_axis, v_axis, PLATFORM_LENGTH, 0.0)
+        roof = [(iso.m(side * SHELTER_ROOF_IN), iso.m(SHELTER_ROOF_H)),
+                (iso.m(side * SHELTER_ROOF_OUT), iso.m(SHELTER_ROOF_H)),
+                (iso.m(side * SHELTER_ROOF_OUT),
+                 iso.m(SHELTER_ROOF_H + SHELTER_ROOF_THICK)),
+                (iso.m(side * SHELTER_ROOF_IN),
+                 iso.m(SHELTER_ROOF_H + SHELTER_ROOF_THICK))]
+        pane = iso.extrude_profile(f"roof{side:+.0f}", roof, start, end,
+                                   v_axis, up, glass, caps=False)
+        iso.no_shadow(pane)
+        # Lit rail along the platform-side roof edge, marker-swapped to the
+        # reserved light when packed.
+        rail = [(iso.m(side * SHELTER_ROOF_IN), iso.m(SHELTER_ROOF_H)),
+                (iso.m(side * (SHELTER_ROOF_IN + 0.22)),
+                 iso.m(SHELTER_ROOF_H)),
+                (iso.m(side * (SHELTER_ROOF_IN + 0.22)),
+                 iso.m(SHELTER_ROOF_H + SHELTER_RAIL_H)),
+                (iso.m(side * SHELTER_ROOF_IN),
+                 iso.m(SHELTER_ROOF_H + SHELTER_RAIL_H))]
+        lit = iso.extrude_profile(f"rail{side:+.0f}", rail, start, end,
+                                  v_axis, up, cove_mat, caps=False)
+        iso.no_shadow(lit)
+        for u in SHELTER_POST_US:
+            base = local(u_axis, v_axis, u, side * SHELTER_POST_V)
+            sq = iso.m(SHELTER_POST_HALF)
+            post_profile = [(-sq, -sq), (sq, -sq), (sq, sq), (-sq, sq)]
+            iso.extrude_profile(f"post{side:+.0f}_{u:+.0f}", post_profile,
+                                base + up * iso.m(PLATFORM_TOP),
+                                base + up * iso.m(SHELTER_ROOF_H + 0.02),
+                                u_axis, v_axis, steel, caps=True)
+
+
+# --------------------------------------------------------------------------
+# Terminal (2100): the vacuum century's interchange. Two gull-wings — one
+# over each platform — rising from outer walls toward high glass lips that
+# face each other over the open guideway, in the 2000 tube's deeper tint
+# and denser framing, a lit cove along each lip. The sky stays open above
+# the beam: pods arrive under the wings, not through a wall.
+# --------------------------------------------------------------------------
+
+TERM_WALL_V = 7.1        # outer wall line, metres from the centreline
+TERM_WALL_TOP = 3.6
+TERM_LIP_V = 2.5         # inner high edge over the platform's track side
+TERM_LIP_TOP = 7.6
+TERM_THICK = 0.22
+TERM_RIB_US = (-8.0, -2.7, 2.7, 8.0)     # denser than the concourse's 8m
+TERM_RIB_WIDTH = 0.55
+TERM_RIB_PROUD = 0.12
+TERM_TINT = (0.52, 0.70, 0.76)           # the 2000 tube's deeper glass
+TERM_FRAME = (0.400, 0.430, 0.480)
+
+
+def terminal_wing(swell: float = 0.0):
+    """Closed crescent of one gull-wing: outer wall top to inner lip, a
+    quarter-superellipse leaning over the platform."""
+    outer, inner = [], []
+    steps = 10
+    for i in range(steps + 1):
+        t = i / steps
+        s = math.sin(math.pi / 2 * t)
+        v = TERM_WALL_V + (TERM_LIP_V - TERM_WALL_V) * (s ** 1.15)
+        w = TERM_WALL_TOP + (TERM_LIP_TOP - TERM_WALL_TOP) * (1 - math.cos(
+            math.pi / 2 * t) ** 1.3)
+        outer.append((v + swell * 0.4, w + swell))
+        inner.append((v + swell * 0.4, w + swell - TERM_THICK))
+    return outer + list(reversed(inner))
+
+
+def build_terminal(layout_index: int, part: str, pal) -> None:
+    u_axis, v_axis = frame(layout_index)
+    up = Vector((0, 0, 1))
+    build_platforms(u_axis, v_axis, part, pal)
+
+    glass = iso.make_glass("wing", TERM_TINT, face_alpha=0.15,
+                           edge_alpha=0.72)
+    steel = iso.make_material("term_frame", TERM_FRAME,
+                              roughness=0.38, metallic=0.55, noise=0.05)
+    wall = iso.make_material("term_wall", pal["wall"], roughness=0.80,
+                             noise=0.18, seams=0.12, seam_period_m=4.0)
+    cove_mat = iso.make_flag_emission("cove")
+
+    side = 1.0 if part == "front" else -1.0
+    start = local(u_axis, v_axis, -PLATFORM_LENGTH, 0.0)
+    end = local(u_axis, v_axis, PLATFORM_LENGTH, 0.0)
+
+    def sweep(name, profile_m, material, u0=-PLATFORM_LENGTH,
+              u1=PLATFORM_LENGTH, caps=False):
+        profile = [(iso.m(v), iso.m(w)) for v, w in profile_m]
+        return iso.extrude_profile(name, profile,
+                                   local(u_axis, v_axis, u0, 0.0),
+                                   local(u_axis, v_axis, u1, 0.0),
+                                   v_axis * side, up, material, caps=caps)
+
+    # Outer wall from grade to the wing's springing.
+    sweep("wall", [(TERM_WALL_V - 0.3, 0.0), (TERM_WALL_V - 0.3, TERM_WALL_TOP),
+                   (TERM_WALL_V + 0.3, TERM_WALL_TOP), (TERM_WALL_V + 0.3, 0.0)],
+          wall, caps=True)
+    wing = sweep("wing", terminal_wing(), glass)
+    iso.no_shadow(wing)
+    for u in TERM_RIB_US:
+        sweep(f"rib{u:+.0f}", terminal_wing(swell=TERM_RIB_PROUD), steel,
+              u - TERM_RIB_WIDTH / 2, u + TERM_RIB_WIDTH / 2)
+    # Lit cove along the high lip: the terminal's signature at night — two
+    # bright lines facing each other over the arriving pods.
+    lip = [(TERM_LIP_V - 0.16, TERM_LIP_TOP - 0.34),
+           (TERM_LIP_V + 0.16, TERM_LIP_TOP - 0.34),
+           (TERM_LIP_V + 0.16, TERM_LIP_TOP - 0.06),
+           (TERM_LIP_V - 0.16, TERM_LIP_TOP - 0.06)]
+    lit = sweep("lip", lip, cove_mat)
+    iso.no_shadow(lit)
+
+
 BUILDERS = {"station": build_station, "depot": build_depot,
-            "concourse": build_concourse}
+            "concourse": build_concourse, "shelter": build_shelter,
+            "terminal": build_terminal}
 
 
 def parse_args():

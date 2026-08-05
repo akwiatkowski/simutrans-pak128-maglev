@@ -30,7 +30,8 @@ REFERENCE_SHEET := upstream/infrastructure/rail_tracks/rail_400_tracks.png
 
 .DEFAULT_GOAL := build
 .PHONY: build makeobj check install run status art \
-        track-2d track-3d station depot concourse fleet tube signal bridge tunnel \
+        track-2d track-3d station depot concourse shelter terminal \
+        fleet tube signal bridge tunnel \
         readme-trains iso-selftest preview
 
 status:
@@ -123,7 +124,7 @@ track-3d:
 
 # Stop, depot and concourse. All are buildings: two orientations, each split
 # into a back image drawn before vehicles and a front image drawn after.
-station depot concourse:
+station depot concourse shelter terminal:
 	$(BLENDER) --background --python tools/blender/build_maglev_buildings.py -- \
 		--object $@ --out build/$@ --samples $(RENDER_SAMPLES)
 	$(PYTHON) tools/assemble_sheet.py build/$@ \
@@ -151,7 +152,7 @@ tube:
 		|| exit 1; \
 	done
 
-art: track-3d station depot concourse fleet tube signal bridge tunnel
+art: track-3d station depot concourse shelter terminal fleet tube signal bridge tunnel
 
 # Assert the Blender camera still lands on pak128's pixel grid. Run this after
 # touching anything in tools/blender/simutrans_iso.py.

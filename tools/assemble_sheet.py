@@ -438,8 +438,8 @@ def main() -> None:
     parser.add_argument("--supersample", type=int, default=4)
     parser.add_argument("--sheet", default="track",
                         choices=["track", "tube", "station", "depot",
-                                 "concourse", "vehicle", "signal", "bridge",
-                                 "tunnel"],
+                                 "concourse", "shelter", "terminal",
+                                 "vehicle", "signal", "bridge", "tunnel"],
                         help="which sheet layout to pack")
     args = parser.parse_args()
 
@@ -498,7 +498,7 @@ def assemble_building(args) -> None:
 
     # The concourse canopy is glazing and needs real per-pixel alpha, so its
     # sheet is RGBA like the tubes'; the opaque buildings keep the RGB key.
-    rgba = args.sheet == "concourse"
+    rgba = args.sheet in ("concourse", "shelter", "terminal")
     cells_dir = pathlib.Path(args.cells)
     size = (layout.STATION_COLS * layout.CELL, layout.STATION_ROWS * layout.CELL)
     sheet = Image.new("RGBA", size, (0, 0, 0, 0)) if rgba \
@@ -540,7 +540,7 @@ def assemble_building(args) -> None:
 
     # The depot and concourse legitimately carry the reserved light (portal
     # outline, cove); protecting it keeps the scrub from nudging it dark.
-    protect = args.sheet in ("depot", "concourse")
+    protect = args.sheet in ("depot", "concourse", "shelter", "terminal")
     scrub_sheet(sheet, protect_light=protect).save(args.out)
     print(f"wrote {args.out}: {done} rendered cells"
           + (f", missing {', '.join(missing)}" if missing else ""))
