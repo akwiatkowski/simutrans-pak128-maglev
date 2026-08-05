@@ -120,10 +120,16 @@ fleet:
 # so the sheet is four 5-row blocks, and it is written RGBA because glass
 # needs real per-pixel alpha.
 tube:
-	$(BLENDER) --background --python tools/blender/build_maglev_track.py -- \
-		--out build/tube --season both --enclosure tube --samples $(RENDER_SAMPLES)
-	$(PYTHON) tools/assemble_sheet.py build/tube \
-		-o "$(IMAGES_DIR)/maglev_tube.png" --sheet tube
+	for t in 1000 2000 4000; do \
+		out="$(IMAGES_DIR)/maglev_tube$$t.png"; \
+		[ "$$t" = "1000" ] && out="$(IMAGES_DIR)/maglev_tube.png"; \
+		$(BLENDER) --background --python tools/blender/build_maglev_track.py -- \
+			--out "build/tube$$t" --season both --enclosure tube --tier $$t \
+			--samples $(RENDER_SAMPLES) && \
+		$(PYTHON) tools/assemble_sheet.py "build/tube$$t" \
+			-o "$$out" --sheet tube \
+		|| exit 1; \
+	done
 
 art: track-3d station depot concourse fleet tube signal
 
