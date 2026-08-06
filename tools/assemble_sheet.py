@@ -436,9 +436,13 @@ def main() -> None:
     parser.add_argument("-o", "--out", required=True)
     parser.add_argument("--base", help="sheet to take any missing cells from")
     parser.add_argument("--supersample", type=int, default=4)
+    parser.add_argument("--icons", default="300,500,700",
+                        help="track sheets: speed icons for row 0")
+    parser.add_argument("--tall", action="store_true",
+                        help="track sheets: allow tall content (elevated)")
     parser.add_argument("--sheet", default="track",
                         choices=["track", "tube", "station", "depot",
-                                 "concourse", "shelter", "terminal",
+                                 "concourse", "shelter", "terminal", "skystop",
                                  "vehicle", "signal", "bridge", "tunnel"],
                         help="which sheet layout to pack")
     args = parser.parse_args()
@@ -465,6 +469,11 @@ def main() -> None:
     else:
         sheet = Image.new("RGB", size, layout.KEY)
 
+    global MAX_OBJECT_PX
+    if args.tall:
+        # An elevated deck stands a full height level above the diamond,
+        # far past the stop-block budget.
+        MAX_OBJECT_PX = TUBE_MAX_PX
     done, missing = 0, []
     for (row, col), spec in sorted(layout.CELL_PLAN.items()):
         for season_offset in (0, layout.WINTER_ROW_OFFSET):
@@ -478,7 +487,7 @@ def main() -> None:
                         (col * layout.CELL, out_row * layout.CELL))
             done += 1
 
-    for col, speed in ((4, 300), (5, 500), (6, 700)):
+    for col, speed in zip((4, 5, 6), [int(v) for v in args.icons.split(",")]):
         sheet.paste(Image.fromarray(render_icon(speed)), (col * layout.CELL, 0))
     sheet.paste(Image.fromarray(render_cursor()), (7 * layout.CELL, 0))
     from PIL import ImageDraw
@@ -498,7 +507,7 @@ def assemble_building(args) -> None:
 
     # The concourse canopy is glazing and needs real per-pixel alpha, so its
     # sheet is RGBA like the tubes'; the opaque buildings keep the RGB key.
-    rgba = args.sheet in ("concourse", "shelter", "terminal")
+    rgba = args.sheet in ("concourse", "shelter", "terminal", "skystop")
     cells_dir = pathlib.Path(args.cells)
     size = (layout.STATION_COLS * layout.CELL, layout.STATION_ROWS * layout.CELL)
     sheet = Image.new("RGBA", size, (0, 0, 0, 0)) if rgba \
@@ -540,7 +549,7 @@ def assemble_building(args) -> None:
 
     # The depot and concourse legitimately carry the reserved light (portal
     # outline, cove); protecting it keeps the scrub from nudging it dark.
-    protect = args.sheet in ("depot", "concourse", "shelter", "terminal")
+    protect = args.sheet in ("depot", "concourse", "shelter", "terminal", "skystop")
     scrub_sheet(sheet, protect_light=protect).save(args.out)
     print(f"wrote {args.out}: {done} rendered cells"
           + (f", missing {', '.join(missing)}" if missing else ""))

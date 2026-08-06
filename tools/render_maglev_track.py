@@ -459,7 +459,12 @@ def render_icon(speed: int) -> np.ndarray:
     # renders; the 700's blue sits one step off the reserved light so the
     # icon is not remapped as a player colour.
     img[27:31, 2:30] = SUMMER["apron"]
-    if speed == 300:
+    if speed == 160:
+        img[25:28, 6:26] = (196, 202, 205)          # elevated urban beam
+        img[26:27, 6:26] = (28, 116, 120)           # teal service stripe
+        for x in range(9, 26, 7):
+            img[28:31, x:x + 2] = (120, 120, 118)   # pylons beneath
+    elif speed == 300:
         img[27:30, 6:26] = (187, 176, 148)          # warm site-cast sand
         for x in range(6, 26, 5):                   # stator teeth
             img[28:30, x:x + 3] = (44, 46, 50)

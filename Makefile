@@ -30,7 +30,7 @@ REFERENCE_SHEET := upstream/infrastructure/rail_tracks/rail_400_tracks.png
 
 .DEFAULT_GOAL := build
 .PHONY: build makeobj check install run status art \
-        track-2d track-3d station depot concourse shelter terminal \
+        track-2d track-3d elevated station depot concourse shelter terminal skystop \
         fleet tube signal bridge tunnel \
         readme-trains readme-stations iso-selftest preview
 
@@ -111,6 +111,15 @@ signal:
 	$(PYTHON) tools/assemble_sheet.py build/signal \
 		-o "$(IMAGES_DIR)/maglev_signal.png" --sheet signal
 
+# The urban elevated tier: one level up on single columns, tall packing.
+elevated:
+	$(BLENDER) --background --python tools/blender/build_maglev_track.py -- \
+		--out build/cells160 --season both --tier 160 \
+		--samples $(RENDER_SAMPLES)
+	$(PYTHON) tools/assemble_sheet.py build/cells160 \
+		-o "$(IMAGES_DIR)/maglev_elevated.png" --sheet track \
+		--icons 160,160,160 --tall
+
 # Procedural 2D sheet. Seconds to run, no Blender needed.
 track-2d:
 	$(PYTHON) tools/render_maglev_track.py -o "$(TRACK_BASE)"
@@ -129,7 +138,7 @@ track-3d:
 
 # Stop, depot and concourse. All are buildings: two orientations, each split
 # into a back image drawn before vehicles and a front image drawn after.
-station depot concourse shelter terminal:
+station depot concourse shelter terminal skystop:
 	$(BLENDER) --background --python tools/blender/build_maglev_buildings.py -- \
 		--object $@ --out build/$@ --samples $(RENDER_SAMPLES)
 	$(PYTHON) tools/assemble_sheet.py build/$@ \
@@ -157,7 +166,7 @@ tube:
 		|| exit 1; \
 	done
 
-art: track-3d station depot concourse shelter terminal fleet tube signal bridge tunnel
+art: track-3d elevated station depot concourse shelter terminal skystop fleet tube signal bridge tunnel
 
 # Assert the Blender camera still lands on pak128's pixel grid. Run this after
 # touching anything in tools/blender/simutrans_iso.py.
