@@ -10,6 +10,10 @@ NoInfo=1
 # Between the open stop (9) and the concourse (15): a
 # roofed platform holds more than bare concrete.
 Level=12
+# Explicit capacity: the engine default (level*32) undersizes
+# waiting rooms against this roster's 200-380 seat trains; sized to
+# hold about 1.5 full era-matching trainloads.
+capacity=520
 allow_underground=0
 # 2032: the 700 guideway's year — the shelter wears its
 # glass fences and lit rails.

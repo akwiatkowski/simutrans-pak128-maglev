@@ -10,6 +10,10 @@ NoInfo=1
 # Roughly balanced against the open stop's Level=9: a roofed concourse holds
 # more people. Like the stop's level, not tuned against pak128 yet.
 Level=15
+# Explicit capacity: the engine default (level*32) undersizes
+# waiting rooms against this roster's 200-380 seat trains; sized to
+# hold about 1.5 full era-matching trainloads.
+capacity=700
 allow_underground=0
 # 2064: the year Aetheris appeared with a capsule and no tube to run it in —
 # the fusion era's opening move. The concourse is its station-side echo.

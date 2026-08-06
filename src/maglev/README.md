@@ -422,10 +422,14 @@ Regenerate it alongside the roster.
 
 ## Known gaps
 
-- `Level=9` on the stop is rough. Vehicle costs and running costs are now
-  calibrated against pak128's own rail stock and the standard engine's
-  revenue model (see `tools/render_readme_trains.py`), but none of it has
-  been play-tested against a human opponent's rail network.
+- Station levels are calibrated against pak128's own passenger stops (their
+  ceiling is Level 11 in 1989; this ladder runs 9/12/15/22 into eras pak128
+  never reaches, with explicit `capacity` sized to ~1.5 era-matching
+  trainloads since the engine default of level×32 undersizes waiting rooms
+  against 200-380 seat trains). Vehicle costs and running costs are
+  calibrated against pak128 stock and the engine's revenue model (see
+  `tools/render_readme_trains.py`). None of it has been play-tested against
+  a human opponent's rail network.
 - Nothing has been run in the game yet. Everything is verified by compositing
   the sheets the way Simutrans layers them, plus a clean `makeobj` pack.
 - Junction tiles simply let the two tubes intersect. It reads acceptably as a

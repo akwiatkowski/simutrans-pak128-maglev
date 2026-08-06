@@ -10,6 +10,10 @@ NoInfo=1
 # The vacuum century's interchange, above the concourse's
 # 15 — sized for 300-passenger capsules on 3000-tile trunks.
 Level=22
+# Explicit capacity: the engine default (level*32) undersizes
+# waiting rooms against this roster's 200-380 seat trains; sized to
+# hold about 1.5 full era-matching trainloads.
+capacity=1150
 allow_underground=0
 # 2100: the 2000 km/h tube's year; the terminal wears its
 # deeper glass.
