@@ -133,6 +133,16 @@ PALETTE = {
 # --------------------------------------------------------------------------
 
 TRACK_TIERS = {
+    # The urban elevated: not a speed tier but a place tier — the monorail
+    # role, threading over streets on single columns with the ground left
+    # entirely free. Clean municipal concrete with a teal service stripe;
+    # its character is the pylon rhythm, not the beam.
+    160: dict(girder=(0.560, 0.590, 0.600),
+              girder_seams=0.08, seam_period=8.0, seam_width=0.06,
+              slot=None,
+              stators=False, snow_slots=False, posts=False, cabinets=0.0,
+              conduit=False, fairing=False, fence=False, heated_deck=False,
+              lit_edges=False, elevated=True),
     300: dict(girder=(0.500, 0.430, 0.300),   # warm site-cast sand
               girder_seams=0.42, seam_period=8.0, seam_width=0.22,
               slot=(0.330, 0.285, 0.205),     # concrete slot floor between packs
@@ -655,8 +665,13 @@ def build_cell(spec, season, enclosure="none", part="back", tier=1000):
 
     runs = [r for r in runs_for(spec)]
 
+    # The elevated tier rides one height level up on its own columns, the
+    # ground left free — that is the whole point of the urban system.
+    elevated = cfg.get("elevated", False)
+    deck_lift = up * (iso.HEIGHT_STEP if elevated else 0.0)
+
     for i, spec_run in enumerate(runs):
-        lift = up * iso.m(spec_run["lift"])
+        lift = up * iso.m(spec_run["lift"]) + deck_lift
         start = iso.ground_point(shape, *spec_run["start"]) + lift
         end = iso.ground_point(shape, *spec_run["end"]) + lift
         axis = end - start
@@ -667,7 +682,45 @@ def build_cell(spec, season, enclosure="none", part="back", tier=1000):
         right = axis.cross(up).normalized()
         over = iso.m(spec_run["overrun"])
 
-        if enclosure != "tube":
+        if elevated:
+            # Single tapered columns on a world-anchored pitch, each on a
+            # small pad; the beam's teal service stripe rides each flank.
+            col_mat = iso.make_material("column",
+                                        tuple(c * 0.88 for c in pal["apron"]),
+                                        roughness=0.88, noise=0.20)
+            stripe_mat = iso.make_material("stripe", (0.055, 0.290, 0.300),
+                                           roughness=0.45, metallic=0.20)
+            for s in (-1.0, 1.0):
+                x_in = s * (GIRDER_HALF - 0.02)
+                x_out = s * (GIRDER_HALF + 0.08)
+                stripe = [(iso.m(x_in), iso.m(0.30)),
+                          (iso.m(x_out), iso.m(0.30)),
+                          (iso.m(x_out), iso.m(0.55)),
+                          (iso.m(x_in), iso.m(0.55))]
+                iso.extrude_profile(f"stripe{i}_{s:+.0f}", stripe,
+                                    start - axis * over, end + axis * over,
+                                    right, up, stripe_mat,
+                                    bevel=0.0, caps=False)
+            ground = -deck_lift
+            for k, t in enumerate(anchored(start, axis, length, 8.0)):
+                if not (0.0 <= t <= length):
+                    continue
+                foot = start + axis * t + ground
+                col = [(iso.m(-0.62), 0.0), (iso.m(0.62), 0.0),
+                       (iso.m(0.44), iso.HEIGHT_STEP + iso.m(0.05)),
+                       (iso.m(-0.44), iso.HEIGHT_STEP + iso.m(0.05))]
+                iso.extrude_profile(f"column{i}_{k}", col,
+                                    foot - axis * iso.m(0.55),
+                                    foot + axis * iso.m(0.55),
+                                    right, up, col_mat, bevel=iso.m(0.04),
+                                    caps=True)
+                pad = [(iso.m(-0.85), -iso.m(0.02)), (iso.m(0.85), -iso.m(0.02)),
+                       (iso.m(0.85), iso.m(0.10)), (iso.m(-0.85), iso.m(0.10))]
+                iso.extrude_profile(f"pad{i}_{k}", pad,
+                                    foot - axis * iso.m(0.85),
+                                    foot + axis * iso.m(0.85),
+                                    right, up, col_mat, bevel=0.0, caps=True)
+        elif enclosure != "tube":
             # Foundation band under the run: slab top with a drainage
             # gutter along each edge, everything else left as terrain.
             gutter_mat = iso.make_material("gutter",
@@ -891,6 +944,73 @@ def build_tube(spec, season, near: bool, tier: int = 1000) -> None:
                                 base - axis * iso.m(RIB_WIDTH / 2),
                                 base + axis * iso.m(RIB_WIDTH / 2),
                                 side, up, frame, bevel=0.0, caps=False)
+
+    if len(runs) > 1:
+        build_tube_drum(near, up, glass, frame, cove_mat)
+
+
+# A junction of glazed tubes is a node, not a clip: a vertical rotunda drum
+# wraps the bore intersection, its glass over theirs, a frame ring at the
+# crown and a cove ring at eye height so the junction glows as a landmark.
+DRUM_RADIUS = TUBE_HALF_WIDTH + 0.55
+DRUM_TOP = TUBE_HEIGHT + 0.85
+DRUM_SEGMENTS = 20
+DRUM_RING_DEPTH = 0.30       # frame ring below the crown edge
+DRUM_CAP_RISE = 0.35         # shallow frame cap dome above the wall
+
+
+def build_tube_drum(near: bool, up, glass, frame, cove_mat) -> None:
+    """One half of the junction rotunda; the near half rides in the front
+    image so a pod inside the node stays visible through its glass."""
+    import math as _math
+    centre = Vector((0.0, 0.0, 0.0))
+
+    def rim(radius, height):
+        pts = []
+        for s in range(DRUM_SEGMENTS + 1):
+            ang = 2.0 * _math.pi * s / DRUM_SEGMENTS
+            pts.append(centre + Vector((radius * _math.cos(ang),
+                                        radius * _math.sin(ang), 0.0))
+                       + up * iso.m(height))
+        return pts
+
+    def half_faces(lo_pts, hi_pts, want_near):
+        verts, faces = [], []
+        for s in range(DRUM_SEGMENTS):
+            a, b = lo_pts[s], lo_pts[s + 1]
+            c, d = hi_pts[s + 1], hi_pts[s]
+            mid = (a + b) / 2
+            # Near = towards the camera: screen y grows with world x - y.
+            if ((mid.x - mid.y) > 0.0) != want_near:
+                continue
+            base = len(verts)
+            verts += [a, b, c, d]
+            faces.append([base, base + 1, base + 2, base + 3])
+        return verts, faces
+
+    r = iso.m(DRUM_RADIUS)
+    wall_v, wall_f = half_faces(rim(r, 0.0), rim(r, DRUM_TOP), near)
+    if wall_v:
+        obj = iso.new_mesh("drum_wall", wall_v, wall_f, glass)
+        iso.no_shadow(obj)
+    ring_v, ring_f = half_faces(rim(r + iso.m(0.06), DRUM_TOP - DRUM_RING_DEPTH),
+                                rim(r + iso.m(0.06), DRUM_TOP), near)
+    if ring_v:
+        iso.new_mesh("drum_ring", ring_v, ring_f, frame)
+    cove_v, cove_f = half_faces(rim(r + iso.m(0.05), COVE_LO),
+                                rim(r + iso.m(0.05), COVE_HI), near)
+    if cove_v:
+        lit = iso.new_mesh("drum_cove", cove_v, cove_f, cove_mat)
+        iso.no_shadow(lit)
+    if near:
+        # Shallow frame cap closing the drum, always in the front pass —
+        # it sits above anything that can be inside.
+        top = rim(r, DRUM_TOP)
+        apex = centre + up * iso.m(DRUM_TOP + DRUM_CAP_RISE)
+        verts = top + [apex]
+        faces = [[s, s + 1, DRUM_SEGMENTS + 1]
+                 for s in range(DRUM_SEGMENTS)]
+        iso.new_mesh("drum_cap", verts, faces, frame)
 
 
 def build_stop_block(name, base: Vector, direction: Vector, right: Vector,
