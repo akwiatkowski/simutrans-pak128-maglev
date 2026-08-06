@@ -669,9 +669,81 @@ def build_terminal(layout_index: int, part: str, pal) -> None:
     iso.no_shadow(lit)
 
 
+# --------------------------------------------------------------------------
+# Skystop (2008): the urban elevated tier's stop. The engine draws a stop
+# building on the elevated ground already lifted (pak128's suspended
+# monorail station is authored at normal height with no offsets), and the
+# way's own columns carry the street-level visual — so this is a floating
+# metro stop: slim platforms, steel railings, a thin teal-fascia canopy.
+# --------------------------------------------------------------------------
+
+SKY_RAIL_TOP = 1.05          # railing above the platform deck
+SKY_ROOF_H = 3.55
+SKY_ROOF_IN, SKY_ROOF_OUT = 2.4, 6.0
+SKY_POST_US = (-5.0, 5.0)
+TEAL = (0.055, 0.290, 0.300)
+
+
+def build_skystop(layout_index: int, part: str, pal) -> None:
+    u_axis, v_axis = frame(layout_index)
+    up = Vector((0, 0, 1))
+    build_platforms(u_axis, v_axis, part, pal)
+
+    glass = iso.make_glass("roof", pal["canopy_tint"],
+                           face_alpha=0.15, edge_alpha=0.65)
+    steel = iso.make_material("steel", pal["frame"],
+                              roughness=0.40, metallic=0.60)
+    teal = iso.make_material("fascia", TEAL, roughness=0.45, metallic=0.20)
+
+    start = local(u_axis, v_axis, -PLATFORM_LENGTH, 0.0)
+    end = local(u_axis, v_axis, PLATFORM_LENGTH, 0.0)
+    sides = [1.0] if part == "front" else [-1.0, 1.0]
+    for side in sides:
+        # Railing along the outer platform edge: a floating platform needs
+        # one, and its thin dark line is what says "elevated" at 128px.
+        rail_v = PLATFORM_OUTER - 0.12
+        for h in (SKY_RAIL_TOP,):
+            bar = [(iso.m(side * (rail_v - 0.04)), iso.m(PLATFORM_TOP + h - 0.05)),
+                   (iso.m(side * (rail_v + 0.04)), iso.m(PLATFORM_TOP + h - 0.05)),
+                   (iso.m(side * (rail_v + 0.04)), iso.m(PLATFORM_TOP + h)),
+                   (iso.m(side * (rail_v - 0.04)), iso.m(PLATFORM_TOP + h))]
+            iso.extrude_profile(f"rail{side:+.0f}", bar, start, end,
+                                v_axis, up, steel, caps=False)
+        for u in (-6.5, -2.2, 2.2, 6.5):
+            base = local(u_axis, v_axis, u, side * rail_v)
+            sq = iso.m(0.045)
+            iso.extrude_profile(f"baluster{side:+.0f}_{u:+.1f}",
+                                [(-sq, -sq), (sq, -sq), (sq, sq), (-sq, sq)],
+                                base + up * iso.m(PLATFORM_TOP),
+                                base + up * iso.m(PLATFORM_TOP + SKY_RAIL_TOP),
+                                u_axis, v_axis, steel, caps=True)
+        # Thin glass canopy with a teal fascia edge, on two slim posts.
+        roof = [(iso.m(side * SKY_ROOF_IN), iso.m(SKY_ROOF_H)),
+                (iso.m(side * SKY_ROOF_OUT), iso.m(SKY_ROOF_H)),
+                (iso.m(side * SKY_ROOF_OUT), iso.m(SKY_ROOF_H + 0.12)),
+                (iso.m(side * SKY_ROOF_IN), iso.m(SKY_ROOF_H + 0.12))]
+        pane = iso.extrude_profile(f"roof{side:+.0f}", roof, start, end,
+                                   v_axis, up, glass, caps=False)
+        iso.no_shadow(pane)
+        fascia = [(iso.m(side * SKY_ROOF_IN), iso.m(SKY_ROOF_H)),
+                  (iso.m(side * (SKY_ROOF_IN + 0.24)), iso.m(SKY_ROOF_H)),
+                  (iso.m(side * (SKY_ROOF_IN + 0.24)), iso.m(SKY_ROOF_H + 0.20)),
+                  (iso.m(side * SKY_ROOF_IN), iso.m(SKY_ROOF_H + 0.20))]
+        iso.extrude_profile(f"fascia{side:+.0f}", fascia, start, end,
+                            v_axis, up, teal, caps=False)
+        for u in SKY_POST_US:
+            base = local(u_axis, v_axis, u, side * 4.4)
+            sq = iso.m(0.11)
+            iso.extrude_profile(f"post{side:+.0f}_{u:+.0f}",
+                                [(-sq, -sq), (sq, -sq), (sq, sq), (-sq, sq)],
+                                base + up * iso.m(PLATFORM_TOP),
+                                base + up * iso.m(SKY_ROOF_H + 0.02),
+                                u_axis, v_axis, steel, caps=True)
+
+
 BUILDERS = {"station": build_station, "depot": build_depot,
             "concourse": build_concourse, "shelter": build_shelter,
-            "terminal": build_terminal}
+            "terminal": build_terminal, "skystop": build_skystop}
 
 
 def parse_args():

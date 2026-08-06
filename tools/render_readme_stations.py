@@ -34,7 +34,17 @@ VEH_FRAC = 12 / 16
 BACK_L0, FRONT_L0 = 0, 2
 
 # (name, station sheet, way, train tag, train parts, year line, paragraph)
+# A way name prefixed with "^" is the elevated tier: the engine draws the
+# stop and the train on the lifted ground, which the compositor emulates by
+# shifting them one height level (16px) up over the columned way.
 SCENES = [
+    ("skystop", "maglev_skystop", ("^elevated", False), "volta220",
+     "Urban elevated stop — 2008, Level 10",
+     "The 160 km/h urban tier's stop: railed floating platforms and thin "
+     "teal-fascia canopies, lifted by the engine onto the elevated ground "
+     "while the guideway's own columns carry the street beneath. A Volta "
+     "220 calls, capped at metro speed — any trainset can, since every pod "
+     "wraps the same beam."),
     ("stop", "maglev_station", ("track_300", False), "kestrel260",
      "Open stop — 2000, Level 9",
      "Two bare platforms flanking the guideway, amber safety strips and "
@@ -83,6 +93,9 @@ def way_layers(way: str, tube: bool):
 
 def render_scene(name, station_sheet, way_spec, train_tag, n_tiles=5):
     way, tube = way_spec
+    lift = (0, 0)
+    if way.startswith("^"):
+        way, lift = way[1:], (0, -16)
     way_back, way_front = way_layers(way, tube)
     st = Image.open(IMAGES / f"{station_sheet}.png")
     st_back, st_front = crop(st, 1, BACK_L0), crop(st, 1, FRONT_L0)
@@ -100,20 +113,25 @@ def render_scene(name, station_sheet, way_spec, train_tag, n_tiles=5):
     train = ["head", "car", "car", "tail"]
     p_head = 3.35                    # head at the north end of the platforms
 
+    def lifted(k):
+        x, y = origin(k)
+        return x + lift[0], y + lift[1]
+
     # North-to-south painter's algorithm, all layers per tile pass.
     for k in range(n_tiles - 1, -1, -1):
         img.alpha_composite(way_back, origin(k))
         if k in station_tiles:
-            img.alpha_composite(st_back, origin(k))
+            img.alpha_composite(st_back, lifted(k))
     for i, part in enumerate(train):
         col = DIR_CELL_S if part == "tail" else DIR_CELL_N
         sprite = crop(sheets[part], 1, col)
-        img.alpha_composite(sprite, origin(p_head - i * VEH_FRAC))
+        x, y = origin(p_head - i * VEH_FRAC)
+        img.alpha_composite(sprite, (x + lift[0], y + lift[1]))
     for k in range(n_tiles - 1, -1, -1):
         if way_front is not None:
             img.alpha_composite(way_front, origin(k))
         if k in station_tiles:
-            img.alpha_composite(st_front, origin(k))
+            img.alpha_composite(st_front, lifted(k))
 
     img = img.crop(img.getbbox())
     OUT_DIR.mkdir(parents=True, exist_ok=True)

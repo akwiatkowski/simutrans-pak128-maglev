@@ -1,0 +1,29 @@
+obj=building
+name=Prototype_Maglev_Skystop
+copyright=Aleksander Kwiatkowski
+type=stop
+waytype=maglev_track
+enables_pax=1
+enables_post=1
+Dims=1,1,2
+NoInfo=1
+# Between the open stop (9) and the concourse (15): a
+# roofed platform holds more than bare concrete.
+Level=10
+# Explicit capacity: the engine default (level*32) undersizes
+# waiting rooms against this roster's 200-380 seat trains; sized to
+# hold about 1.5 full era-matching trainloads.
+capacity=420
+allow_underground=0
+# 2008: the urban elevated tier's year. The engine lifts a stop
+# building to the elevated ground itself, so the skystop is authored
+# at normal height like every other stop.
+intro_year=2008
+intro_month=1
+retire_year=2999
+icon=> images/maglev_skystop.1.4
+cursor=images/maglev_skystop.1.5
+BackImage[0][0][0][0][0][0]=images/maglev_skystop.1.0
+BackImage[1][0][0][0][0][0]=images/maglev_skystop.1.1
+FrontImage[0][0][0][0][0][0]=images/maglev_skystop.1.2
+FrontImage[1][0][0][0][0][0]=images/maglev_skystop.1.3
