@@ -11,10 +11,10 @@ actually plans a line around:
     * predicted income per game year of constant back-and-forth travel.
 
 The whole block, one paragraph + screenshot per train, is then injected into
-`src/maglev/README.md` between the `<!-- trains:begin -->` / `<!-- trains:end -->`
-markers, so re-running the script after a roster change refreshes the README.
+`docs/rolling-stock.md` between the `<!-- trains:begin -->` / `<!-- trains:end -->`
+markers, so re-running the script after a roster change refreshes the document.
 
-    python3 tools/render_readme_trains.py            # images + README section
+    python3 tools/render_readme_trains.py            # images + doc section
     python3 tools/render_readme_trains.py --table    # just print the numbers
 
 Where every constant comes from
@@ -64,6 +64,7 @@ assumptions.
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import re
 import sys
@@ -77,7 +78,9 @@ import gen_vehicle_roster as roster                  # noqa: E402
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 IMAGES = ROOT / "src/maglev/images"
 OUT_DIR = IMAGES / "readme"
-README = ROOT / "src/maglev/README.md"
+# The document lives in docs/ while the images live under src/, so links are
+# built with os.path.relpath — pathlib's relative_to only walks downwards.
+DOC = ROOT / "docs/rolling-stock.md"
 
 # --------------------------------------------------------------------------
 # Game constants — sources in the module docstring.
@@ -489,7 +492,7 @@ def build_section() -> str:
         econ = economics(entry)
         img = OUT_DIR / f"{entry['tag']}.png"
         render_showcase(entry, img)
-        rel = img.relative_to(README.parent)
+        rel = os.path.relpath(img, DOC.parent)
         out.append(f"#### {entry['name']}")
         out.append("")
         out.append(f"![{entry['name']}]({rel})")
@@ -503,13 +506,13 @@ def build_section() -> str:
 
 
 def inject(section: str) -> None:
-    text = README.read_text()
+    text = DOC.read_text()
     begin, end = "<!-- trains:begin -->", "<!-- trains:end -->"
     if begin not in text or end not in text:
-        raise SystemExit(f"README is missing the {begin} / {end} markers")
+        raise SystemExit(f"{DOC} is missing the {begin} / {end} markers")
     new = re.sub(re.escape(begin) + ".*?" + re.escape(end),
                  begin + "\n" + section + "\n" + end, text, flags=re.S)
-    README.write_text(new)
+    DOC.write_text(new)
 
 
 def main() -> None:
@@ -530,7 +533,8 @@ def main() -> None:
 
     section = build_section()
     inject(section)
-    print(f"wrote {len(roster.ROSTER)} showcases -> {OUT_DIR}, README updated")
+    print(f"wrote {len(roster.ROSTER)} showcases -> {OUT_DIR}, "
+          f"{DOC.relative_to(ROOT)} updated")
 
 
 if __name__ == "__main__":

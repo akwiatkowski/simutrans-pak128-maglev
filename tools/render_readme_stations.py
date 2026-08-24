@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Showcase image + paragraph for every station in the README.
+"""Showcase image + paragraph for every station in the station gallery.
 
 Each stop is staged the way Simutrans layers it — way back image, station
 back, the stopped train, way front (the tube's near glass), station front —
 on its era-matching guideway with an era-matching trainset at the platform.
-The block is injected into `src/maglev/README.md` between the
+The block is injected into `docs/stations.md` between the
 `<!-- stations:begin -->` / `<!-- stations:end -->` markers.
 
     python3 tools/render_readme_stations.py
@@ -12,6 +12,7 @@ The block is injected into `src/maglev/README.md` between the
 
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 import sys
@@ -23,7 +24,9 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 IMAGES = ROOT / "src/maglev/images"
 OUT_DIR = IMAGES / "readme"
-README = ROOT / "src/maglev/README.md"
+# The document lives in docs/ while the images live under src/, so links are
+# built with os.path.relpath — pathlib's relative_to only walks downwards.
+DOC = ROOT / "docs/stations.md"
 
 KEY = (231, 255, 255)
 CELL = 128
@@ -146,7 +149,7 @@ def build_section() -> str:
            "an era-matching trainset at the platform.", ""]
     for name, sheet, way_spec, train, headline, prose in SCENES:
         path = render_scene(name, sheet, way_spec, train)
-        rel = path.relative_to(README.parent)
+        rel = os.path.relpath(path, DOC.parent)
         out += [f"#### {headline}", "", f"![{headline}]({rel})", "",
                 prose, ""]
         print(f"  {name:<10} -> {rel}")
@@ -155,14 +158,14 @@ def build_section() -> str:
 
 def main() -> None:
     section = build_section()
-    text = README.read_text()
+    text = DOC.read_text()
     begin, end = "<!-- stations:begin -->", "<!-- stations:end -->"
     if begin not in text or end not in text:
-        raise SystemExit(f"README is missing the {begin} / {end} markers")
-    README.write_text(re.sub(re.escape(begin) + ".*?" + re.escape(end),
-                             begin + "\n" + section + "\n" + end, text,
-                             flags=re.S))
-    print("README stations section updated")
+        raise SystemExit(f"{DOC} is missing the {begin} / {end} markers")
+    DOC.write_text(re.sub(re.escape(begin) + ".*?" + re.escape(end),
+                          begin + "\n" + section + "\n" + end, text,
+                          flags=re.S))
+    print(f"{DOC.relative_to(ROOT)} stations section updated")
 
 
 if __name__ == "__main__":

@@ -32,7 +32,7 @@ REFERENCE_SHEET := upstream/infrastructure/rail_tracks/rail_400_tracks.png
 .PHONY: build makeobj check install run status art \
         track-2d track-3d elevated station depot concourse shelter terminal skystop \
         fleet tube signal bridge tunnel \
-        readme-trains readme-stations iso-selftest preview
+        docs docs-trains docs-stations iso-selftest preview
 
 status:
 	@printf 'Source: %s\n' '$(SOURCE_DIR)'
@@ -73,15 +73,17 @@ run: install
 
 # --- artwork ---------------------------------------------------------------
 
-# Per-trainset README showcases + economics paragraphs, injected between the
-# trains:begin/end markers in src/maglev/README.md. Pillow only, no Blender.
-readme-trains:
+# Per-trainset showcases + economics paragraphs, injected between the
+# trains:begin/end markers in docs/rolling-stock.md. Pillow only, no Blender.
+docs-trains:
 	$(PYTHON) tools/render_readme_trains.py
 
 # Station gallery: each stop staged with its era's guideway and trainset,
-# injected between the stations:begin/end markers.
-readme-stations:
+# injected between the stations:begin/end markers in docs/stations.md.
+docs-stations:
 	$(PYTHON) tools/render_readme_stations.py
+
+docs: docs-trains docs-stations
 
 # Bridges: 500 viaduct, 1000 tube crossing, 4000 vacuum span.
 bridge:
